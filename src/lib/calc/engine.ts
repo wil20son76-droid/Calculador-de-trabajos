@@ -1,0 +1,177 @@
+import type {
+  CalcItemInput,
+  CalcItemResult,
+  CalcMaterialInput,
+  CalcMaterialResult,
+  CalcQuoteInput,
+  CalcQuoteResult,
+  DiscountType,
+} from "./types";
+
+/** Redondea a 2 decimales evitando errores de coma flotante. */
+export function round2(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/** Calcula el importe de un descuento (porcentaje o fijo) sobre una base, acotado a la base. */
+export function computeDiscountAmount(
+  base: number,
+  type: DiscountType,
+  value: number
+): number {
+  if (base <= 0 || !value) return 0;
+  if (type === "PERCENT") return round2(base * (Math.max(0, value) / 100));
+  if (type === "FIXED") return round2(Math.min(Math.max(0, value), base));
+  return 0;
+}
+
+export function calcMaterial(material: CalcMaterialInput): CalcMaterialResult {
+  const quantity = material.quantity || 0;
+  const purchasePrice = material.purchasePrice || 0;
+  const marginPercent = material.marginPercent || 0;
+  const unitSellPrice = round2(purchasePrice * (1 + marginPercent / 100));
+  const total = round2(unitSellPrice * quantity);
+  const totalCost = round2(purchasePrice * quantity);
+  return {
+    id: material.id,
+    quantity,
+    purchasePrice,
+    marginPercent,
+    unitSellPrice,
+    total,
+    totalCost,
+  };
+}
+
+export function calcItem(item: CalcItemInput): CalcItemResult {
+  let effectiveQuantity = item.quantity || 0;
+  let effectiveUnitPrice = item.unitPrice || 0;
+  let laborTotalHours: number | null = null;
+
+  if (item.useDetailedLabor) {
+    const workers = item.workerCount || 0;
+    const hours = item.hoursPerWorker || 0;
+    laborTotalHours = round2(workers * hours);
+    effectiveQuantity = laborTotalHours;
+    effectiveUnitPrice = item.hourlyRate || 0;
+  }
+
+  const laborGross = round2(effectiveQuantity * effectiveUnitPrice);
+
+  const materials = item.materials.map(calcMaterial);
+  const materialsGross = round2(materials.reduce((sum, m) => sum + m.total, 0));
+  const materialsCost = round2(materials.reduce((sum, m) => sum + m.totalCost, 0));
+
+  const grossTotal = round2(laborGross + materialsGross);
+  const discountAmount = computeDiscountAmount(
+    grossTotal,
+    item.discountType,
+    item.discountValue
+  );
+
+  // El descuento de línea se reparte proporcionalmente entre mano de obra y materiales
+  // para poder seguir separando ambos importes en el resumen y en el cálculo de ROT.
+  const laborShare = grossTotal > 0 ? laborGross / grossTotal : 0;
+  const laborNet = round2(laborGross - discountAmount * laborShare);
+  const materialsNet = round2(materialsGross - discountAmount * (1 - laborShare));
+  const lineTotal = round2(laborNet + materialsNet);
+
+  const costInternal = round2((item.companyCost || 0) + materialsCost);
+
+  return {
+    id: item.id,
+    effectiveQuantity,
+    effectiveUnitPrice,
+    laborTotalHours,
+    laborGross,
+    materialsGross,
+    grossTotal,
+    discountAmount,
+    laborNet,
+    materialsNet,
+    lineTotal,
+    materialsCost,
+    costInternal,
+    materials,
+  };
+}
+
+/**
+ * Calcula el presupuesto completo: mano de obra, materiales, otros costes,
+ * descuentos (de línea y globales), moms/IVA y ROT-avdrag.
+ *
+ * Ninguna regla fiscal está codificada de forma fija: vatRatePercent, rotPercent
+ * y rotMaxDeduction siempre llegan como parámetros configurables desde la empresa
+ * o desde el propio presupuesto (snapshot al crearlo).
+ */
+export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
+  const items = input.items.map(calcItem);
+
+  const laborSubtotal = round2(items.reduce((sum, i) => sum + i.laborNet, 0));
+  const materialSubtotal = round2(items.reduce((sum, i) => sum + i.materialsNet, 0));
+  const otherCostsSubtotal = round2(
+    input.otherCosts.reduce((sum, c) => sum + (c.quantity || 0) * (c.unitPrice || 0), 0)
+  );
+  const subtotalBeforeDiscount = round2(
+    laborSubtotal + materialSubtotal + otherCostsSubtotal
+  );
+
+  const globalDiscountAmount = computeDiscountAmount(
+    subtotalBeforeDiscount,
+    input.discountType,
+    input.discountValue
+  );
+
+  const laborRatio = subtotalBeforeDiscount > 0 ? laborSubtotal / subtotalBeforeDiscount : 0;
+  const materialRatio =
+    subtotalBeforeDiscount > 0 ? materialSubtotal / subtotalBeforeDiscount : 0;
+  const otherRatio = subtotalBeforeDiscount > 0 ? otherCostsSubtotal / subtotalBeforeDiscount : 0;
+
+  const laborAfterDiscount = round2(laborSubtotal - globalDiscountAmount * laborRatio);
+  const materialAfterDiscount = round2(
+    materialSubtotal - globalDiscountAmount * materialRatio
+  );
+  const otherAfterDiscount = round2(otherCostsSubtotal - globalDiscountAmount * otherRatio);
+  const subtotalAfterDiscount = round2(
+    laborAfterDiscount + materialAfterDiscount + otherAfterDiscount
+  );
+
+  const vatAmount = round2(subtotalAfterDiscount * (input.vatRatePercent / 100));
+  const totalInclVat = round2(subtotalAfterDiscount + vatAmount);
+
+  let rotDeduction = 0;
+  if (input.rotEnabled) {
+    rotDeduction = round2(laborAfterDiscount * (input.rotPercent / 100));
+    if (input.rotMaxDeduction != null) {
+      rotDeduction = Math.min(rotDeduction, input.rotMaxDeduction);
+    }
+  }
+  const totalDue = round2(totalInclVat - rotDeduction);
+
+  const totalCostInternal = round2(
+    items.reduce((sum, i) => sum + i.costInternal, 0) + otherCostsSubtotal
+  );
+  const grossProfit = round2(subtotalAfterDiscount - totalCostInternal);
+  const marginPercent =
+    subtotalAfterDiscount > 0 ? round2((grossProfit / subtotalAfterDiscount) * 100) : 0;
+
+  return {
+    items,
+    laborSubtotal,
+    materialSubtotal,
+    otherCostsSubtotal,
+    subtotalBeforeDiscount,
+    globalDiscountAmount,
+    laborAfterDiscount,
+    materialAfterDiscount,
+    otherAfterDiscount,
+    subtotalAfterDiscount,
+    vatAmount,
+    totalInclVat,
+    rotDeduction,
+    totalDue,
+    totalCostInternal,
+    grossProfit,
+    marginPercent,
+  };
+}

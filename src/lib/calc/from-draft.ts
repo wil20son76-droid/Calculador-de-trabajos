@@ -1,0 +1,35 @@
+import type { QuoteDraft } from "@/lib/quotes/draft-types";
+import type { CalcQuoteInput } from "./types";
+
+export function draftToCalcInput(draft: QuoteDraft): CalcQuoteInput {
+  return {
+    discountType: draft.discountType,
+    discountValue: draft.discountValue,
+    vatRatePercent: draft.vatRatePercent,
+    rotEnabled: draft.rotEnabled,
+    rotPercent: draft.rotPercent,
+    otherCosts: draft.otherCosts.map((c) => ({
+      id: c.id,
+      quantity: c.quantity,
+      unitPrice: c.unitPrice,
+    })),
+    items: draft.items.map((item) => ({
+      id: item.id,
+      useDetailedLabor: item.useDetailedLabor,
+      workerCount: item.workerCount,
+      hoursPerWorker: item.hoursPerWorker,
+      hourlyRate: item.hourlyRate,
+      quantity: item.quantity,
+      unitPrice: item.unitPrice,
+      discountType: item.discountType,
+      discountValue: item.discountValue,
+      companyCost: item.companyCost,
+      materials: item.materials.map((m) => ({
+        id: m.id,
+        quantity: m.quantity,
+        purchasePrice: m.purchasePrice,
+        marginPercent: m.marginPercent,
+      })),
+    })),
+  };
+}
