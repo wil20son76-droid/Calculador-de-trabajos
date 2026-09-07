@@ -10,9 +10,16 @@ export const QUOTE_FULL_INCLUDE = {
   project: true,
   items: {
     orderBy: { sortOrder: "asc" as const },
-    include: { materials: { orderBy: { sortOrder: "asc" as const } } },
+    include: {
+      materials: { orderBy: { sortOrder: "asc" as const } },
+      rooms: true,
+    },
   },
   otherCosts: { orderBy: { sortOrder: "asc" as const } },
+  rooms: {
+    orderBy: { sortOrder: "asc" as const },
+    include: { openings: { orderBy: { sortOrder: "asc" as const } } },
+  },
 } satisfies Prisma.QuoteInclude;
 
 export type QuoteWithRelations = Prisma.QuoteGetPayload<{
@@ -37,6 +44,7 @@ export function toCalcInput(quote: QuoteWithRelations): CalcQuoteInput {
       workerCount: item.workerCount != null ? toNumber(item.workerCount) : null,
       hoursPerWorker: item.hoursPerWorker != null ? toNumber(item.hoursPerWorker) : null,
       hourlyRate: item.hourlyRate != null ? toNumber(item.hourlyRate) : null,
+      internalHourlyRate: item.internalHourlyRate != null ? toNumber(item.internalHourlyRate) : null,
       quantity: toNumber(item.quantity),
       unitPrice: toNumber(item.unitPrice),
       discountType: item.discountType,
@@ -73,6 +81,8 @@ export async function recomputeAndCacheQuote(quoteId: string): Promise<CalcQuote
       cachedRotDeduction: result.rotDeduction,
       cachedTotalDue: result.totalDue,
       cachedCostInternal: result.totalCostInternal,
+      cachedLaborCostInternal: result.laborCostInternal,
+      cachedMaterialCostInternal: result.materialCostInternal,
       cachedGrossProfit: result.grossProfit,
       cachedMarginPercent: result.marginPercent,
     },

@@ -7,11 +7,9 @@ import type {
   CalcQuoteResult,
   DiscountType,
 } from "./types";
+import { round2 } from "./round";
 
-/** Redondea a 2 decimales evitando errores de coma flotante. */
-export function round2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
-}
+export { round2 } from "./round";
 
 /** Calcula el importe de un descuento (porcentaje o fijo) sobre una base, acotado a la base. */
 export function computeDiscountAmount(
@@ -76,7 +74,16 @@ export function calcItem(item: CalcItemInput): CalcItemResult {
   const materialsNet = round2(materialsGross - discountAmount * (1 - laborShare));
   const lineTotal = round2(laborNet + materialsNet);
 
-  const costInternal = round2((item.companyCost || 0) + materialsCost);
+  // Coste interno de mano de obra: si se usa el modo de horas detallado y se ha
+  // indicado un coste interno por hora (p.ej. salario real), se calcula a partir
+  // de las horas reales; `companyCost` se suma como coste interno adicional
+  // (p.ej. subcontratas) tanto si se usan horas detalladas como si no.
+  const internalLaborFromHours =
+    item.useDetailedLabor && item.internalHourlyRate
+      ? round2((laborTotalHours || 0) * item.internalHourlyRate)
+      : 0;
+  const laborCostInternal = round2(internalLaborFromHours + (item.companyCost || 0));
+  const costInternal = round2(laborCostInternal + materialsCost);
 
   return {
     id: item.id,
@@ -91,6 +98,7 @@ export function calcItem(item: CalcItemInput): CalcItemResult {
     materialsNet,
     lineTotal,
     materialsCost,
+    laborCostInternal,
     costInternal,
     materials,
   };
@@ -148,9 +156,12 @@ export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
   }
   const totalDue = round2(totalInclVat - rotDeduction);
 
-  const totalCostInternal = round2(
-    items.reduce((sum, i) => sum + i.costInternal, 0) + otherCostsSubtotal
-  );
+  // Desglose interno: venta / coste mano de obra / coste materiales / otros costes.
+  // "Otros costes" se pasan al cliente a coste (sin margen), por lo que su coste
+  // interno es el mismo importe que su venta.
+  const laborCostInternal = round2(items.reduce((sum, i) => sum + i.laborCostInternal, 0));
+  const materialCostInternal = round2(items.reduce((sum, i) => sum + i.materialsCost, 0));
+  const totalCostInternal = round2(laborCostInternal + materialCostInternal + otherCostsSubtotal);
   const grossProfit = round2(subtotalAfterDiscount - totalCostInternal);
   const marginPercent =
     subtotalAfterDiscount > 0 ? round2((grossProfit / subtotalAfterDiscount) * 100) : 0;
@@ -170,6 +181,8 @@ export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
     totalInclVat,
     rotDeduction,
     totalDue,
+    laborCostInternal,
+    materialCostInternal,
     totalCostInternal,
     grossProfit,
     marginPercent,

@@ -10,18 +10,35 @@ import {
   Plus,
   Trash2,
   Copy,
+  Ruler,
+  RefreshCw,
 } from "lucide-react";
 
 import { Field, Input, Select, Textarea } from "@/components/ui/field";
 import { Button } from "@/components/ui/button";
 import { calcItem } from "@/lib/calc/engine";
-import { formatMoney, pricingMethodLabel, unitLabel } from "@/lib/utils/format";
+import { formatMoney, formatNumber, pricingMethodLabel, unitLabel } from "@/lib/utils/format";
 import { PRICING_METHODS, WORK_UNITS } from "@/lib/validation/price-list";
-import { MATERIAL_UNITS } from "@/lib/validation/material";
-import { DISCOUNT_TYPES } from "@/lib/validation/quote";
-import type { ItemDraft, MaterialDraft } from "@/lib/quotes/draft-types";
+import { DISCOUNT_TYPES, MEASUREMENT_SOURCES } from "@/lib/validation/quote";
+import type { ItemDraft, MaterialDraft, RoomDraft } from "@/lib/quotes/draft-types";
+import {
+  aggregateRoomMeasurements,
+  computeRoomMeasurements,
+  getMeasurementValue,
+  type MeasurementSource,
+} from "@/lib/calc/measurements";
 import type { MaterialOption } from "./material-picker-modal";
 import { MaterialPickerModal } from "./material-picker-modal";
+import { QuoteMaterialRow } from "./quote-material-row";
+
+const MEASUREMENT_LABELS: Record<MeasurementSource, string> = {
+  NONE: "Manual (sin medición)",
+  NET_WALL: "Paredes netas (bruto − puertas/ventanas)",
+  GROSS_WALL: "Paredes brutas",
+  CEILING: "Techo",
+  FLOOR: "Suelo",
+  PERIMETER: "Perímetro",
+};
 
 export function QuoteItemRow({
   item,
@@ -29,6 +46,7 @@ export function QuoteItemRow({
   currency,
   materialLibrary,
   defaultMargin,
+  rooms,
   onChange,
   onRemove,
   onDuplicate,
@@ -38,6 +56,7 @@ export function QuoteItemRow({
   currency: string;
   materialLibrary: MaterialOption[];
   defaultMargin: number;
+  rooms: RoomDraft[];
   onChange: (item: ItemDraft) => void;
   onRemove: () => void;
   onDuplicate: () => void;
@@ -74,8 +93,26 @@ export function QuoteItemRow({
     })),
   });
 
+  const selectedRooms = rooms.filter((r) => item.roomIds.includes(r.id));
+  const aggregated = aggregateRoomMeasurements(
+    selectedRooms.map((r) => computeRoomMeasurements(r, r.openings))
+  );
+  const measuredValue =
+    item.measurementSource !== "NONE"
+      ? getMeasurementValue(item.measurementSource, aggregated, item.subtractOpeningWidths)
+      : 0;
+  const measurementDiffers =
+    item.measurementSource !== "NONE" && Math.abs(measuredValue - item.quantity) > 0.01;
+
   function update<K extends keyof ItemDraft>(key: K, value: ItemDraft[K]) {
     onChange({ ...item, [key]: value });
+  }
+
+  function toggleRoom(roomId: string) {
+    const next = item.roomIds.includes(roomId)
+      ? item.roomIds.filter((id) => id !== roomId)
+      : [...item.roomIds, roomId];
+    update("roomIds", next);
   }
 
   function updateMaterial(materialId: string, patch: Partial<MaterialDraft>) {
@@ -192,6 +229,81 @@ export function QuoteItemRow({
             )}
           </div>
 
+          {/* Calculador de habitaciones: reutilizar medición (sección 2, 3, 4) */}
+          {rooms.length > 0 && (
+            <div className="rounded-lg border border-slate-100 bg-slate-50 p-2.5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Ruler className="h-3.5 w-3.5 text-slate-400" />
+                <Select
+                  value={item.measurementSource}
+                  onChange={(e) =>
+                    update("measurementSource", e.target.value as ItemDraft["measurementSource"])
+                  }
+                  className="w-auto py-1 text-xs"
+                >
+                  {MEASUREMENT_SOURCES.map((s) => (
+                    <option key={s} value={s}>
+                      {MEASUREMENT_LABELS[s]}
+                    </option>
+                  ))}
+                </Select>
+                {item.measurementSource === "PERIMETER" && (
+                  <label className="flex items-center gap-1 text-xs text-slate-500">
+                    <input
+                      type="checkbox"
+                      checked={item.subtractOpeningWidths}
+                      onChange={(e) => update("subtractOpeningWidths", e.target.checked)}
+                    />
+                    Restar ancho de puertas (rodapiés)
+                  </label>
+                )}
+              </div>
+
+              {item.measurementSource !== "NONE" && (
+                <>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {rooms.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        onClick={() => toggleRoom(r.id)}
+                        className={
+                          "rounded-full border px-2.5 py-1 text-xs " +
+                          (item.roomIds.includes(r.id)
+                            ? "border-blue-300 bg-blue-100 text-blue-700"
+                            : "border-slate-200 bg-white text-slate-500 hover:bg-slate-100")
+                        }
+                      >
+                        {r.name || "Sin nombre"}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                    <span>
+                      Medida actual:{" "}
+                      <b className="text-slate-900">
+                        {formatNumber(measuredValue, 2)} {item.measurementSource === "PERIMETER" ? "m" : "m²"}
+                      </b>
+                    </span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => update("quantity", measuredValue)}
+                    >
+                      <RefreshCw className="h-3 w-3" /> Usar esta medida
+                    </Button>
+                    {measurementDiffers && (
+                      <span className="text-amber-600">
+                        (la cantidad guardada, {formatNumber(item.quantity, 2)}, no coincide)
+                      </span>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
           <label className="flex items-center gap-2 text-xs text-slate-500">
             <input
               type="checkbox"
@@ -202,7 +314,7 @@ export function QuoteItemRow({
           </label>
 
           {item.useDetailedLabor && (
-            <div className="grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-3">
+            <div className="grid grid-cols-4 gap-2 rounded-lg bg-slate-50 p-3">
               <Field label="Trabajadores">
                 <Input
                   type="number"
@@ -220,12 +332,20 @@ export function QuoteItemRow({
                   onChange={(e) => update("hoursPerWorker", Number(e.target.value))}
                 />
               </Field>
-              <Field label="Precio / hora">
+              <Field label="Precio / hora (cliente)">
                 <Input
                   type="number"
                   min={0}
                   value={item.hourlyRate ?? 0}
                   onChange={(e) => update("hourlyRate", Number(e.target.value))}
+                />
+              </Field>
+              <Field label="Coste interno / hora">
+                <Input
+                  type="number"
+                  min={0}
+                  value={item.internalHourlyRate ?? 0}
+                  onChange={(e) => update("internalHourlyRate", Number(e.target.value))}
                 />
               </Field>
             </div>
@@ -265,7 +385,7 @@ export function QuoteItemRow({
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <Field label="Coste interno (empresa)">
+                <Field label="Coste interno adicional (empresa)">
                   <Input
                     type="number"
                     min={0}
@@ -323,86 +443,19 @@ export function QuoteItemRow({
                           <th className="px-3 py-2 font-medium">Margen %</th>
                           <th className="px-3 py-2 font-medium">Total</th>
                           <th></th>
+                          <th></th>
                         </tr>
                       </thead>
                       <tbody>
                         {item.materials.map((m) => (
-                          <tr key={m.id} className="border-b border-slate-50 last:border-0">
-                            <td className="px-3 py-1.5">
-                              <Input
-                                value={m.name}
-                                onChange={(e) => updateMaterial(m.id, { name: e.target.value })}
-                                className="min-w-[120px] py-1"
-                              />
-                            </td>
-                            <td className="px-3 py-1.5">
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={m.quantity}
-                                onChange={(e) =>
-                                  updateMaterial(m.id, { quantity: Number(e.target.value) })
-                                }
-                                className="w-20 py-1"
-                              />
-                            </td>
-                            <td className="px-3 py-1.5">
-                              <Select
-                                value={m.unit}
-                                onChange={(e) =>
-                                  updateMaterial(m.id, {
-                                    unit: e.target.value as MaterialDraft["unit"],
-                                  })
-                                }
-                                className="py-1"
-                              >
-                                {MATERIAL_UNITS.map((u) => (
-                                  <option key={u} value={u}>
-                                    {unitLabel(u)}
-                                  </option>
-                                ))}
-                              </Select>
-                            </td>
-                            <td className="px-3 py-1.5">
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.01"
-                                value={m.purchasePrice}
-                                onChange={(e) =>
-                                  updateMaterial(m.id, { purchasePrice: Number(e.target.value) })
-                                }
-                                className="w-24 py-1"
-                              />
-                            </td>
-                            <td className="px-3 py-1.5">
-                              <Input
-                                type="number"
-                                min={0}
-                                step="0.1"
-                                value={m.marginPercent}
-                                onChange={(e) =>
-                                  updateMaterial(m.id, { marginPercent: Number(e.target.value) })
-                                }
-                                className="w-20 py-1"
-                              />
-                            </td>
-                            <td className="whitespace-nowrap px-3 py-1.5 font-medium text-slate-700">
-                              {formatMoney(
-                                m.purchasePrice * (1 + m.marginPercent / 100) * m.quantity,
-                                currency
-                              )}
-                            </td>
-                            <td className="px-2">
-                              <button
-                                onClick={() => removeMaterial(m.id)}
-                                className="rounded p-1 text-slate-300 hover:bg-red-50 hover:text-red-600"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
-                            </td>
-                          </tr>
+                          <QuoteMaterialRow
+                            key={m.id}
+                            material={m}
+                            currency={currency}
+                            baseQuantity={item.quantity}
+                            onChange={(patch) => updateMaterial(m.id, patch)}
+                            onRemove={() => removeMaterial(m.id)}
+                          />
                         ))}
                       </tbody>
                     </table>

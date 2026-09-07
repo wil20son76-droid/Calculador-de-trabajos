@@ -29,7 +29,9 @@ src/
     layout/ ui/ shared/  Componentes reutilizables
   lib/
     calc/              Motor de cálculo puro (sin DB ni UI) — mano de obra, materiales,
-                       otros costes, descuentos, moms, ROT
+                       otros costes, descuentos, moms, ROT, mediciones de habitaciones
+                       y cálculo automático de materiales (pintura, suelos, auxiliares).
+                       Con tests unitarios en calc/__tests__/.
     quotes/            Adaptadores entre Prisma y el motor de cálculo, generación de
                        número de presupuesto, cacheo de totales
     pdf/               Documento PDF de la oferta
@@ -96,12 +98,26 @@ npm run start
 | `npm run dev` | Servidor de desarrollo |
 | `npm run build` | Build de producción |
 | `npm run lint` | ESLint |
+| `npm test` | Tests unitarios del motor de cálculo (vitest) |
 | `npm run db:migrate` | `prisma migrate dev` |
 | `npm run db:seed` | Ejecuta `prisma/seed.ts` |
 | `npm run db:studio` | Prisma Studio (explorar la base de datos) |
 
 ## Notas de diseño
 
+- **Calculador de habitaciones**: cada presupuesto puede tener varias habitaciones/zonas
+  (largo, ancho, alto) con puertas y ventanas. El motor de cálculo (`calc/measurements.ts`)
+  deriva siempre suelo, techo, perímetro y paredes brutas/netas a partir de esos valores —
+  nunca se guardan duplicados. Una línea de trabajo puede vincularse a una o varias
+  habitaciones y elegir qué medida usar (pared neta/bruta, techo, suelo o perímetro); el
+  editor muestra la medida en vivo con un botón "Usar esta medida" en vez de forzar la
+  sincronización automática, para que el usuario decida cuándo actualizar.
+- **Cálculo automático de materiales** (`calc/materials-auto.ts`): cada material de una línea
+  puede calcularse solo (nunca de forma obligatoria) a partir de esa medida — pintura/barniz
+  por rendimiento y número de manos con sugerencia de combinación de envases, materiales por
+  consumo por m² (pegamento, imprimación...), o suelos vendidos en paquetes (con `Math.ceil`,
+  nunca compra menos de lo necesario). Se guarda tanto la cantidad calculada como la cantidad
+  final presupuestada, y el editor avisa si difieren tras cambiar una habitación.
 - **ROT-avdrag**: se calcula únicamente sobre el importe de mano de obra (después de
   descuentos), nunca sobre materiales u otros costes. El porcentaje y el interruptor
   ROT sí/no son configurables por empresa y quedan fijados en cada presupuesto al crearlo.

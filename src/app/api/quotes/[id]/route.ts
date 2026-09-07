@@ -42,14 +42,60 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
       return NextResponse.json({ error: "Presupuesto no encontrado" }, { status: 404 });
     }
 
-    const { items, otherCosts, ...scalarFields } = body;
+    const { items, otherCosts, rooms, ...scalarFields } = body;
 
     await prisma.$transaction(async (tx) => {
       await tx.quote.update({ where: { id }, data: scalarFields });
 
-      if (items) {
+      // Los items referencian habitaciones por id, así que las habitaciones deben
+      // recrearse antes que los items para poder mapear los ids nuevos.
+      let roomIdMap = new Map<string, string>();
+      const willRecreateItems = items !== undefined;
+
+      if (rooms) {
+        // Borrar items primero (si se van a recrear): sus QuoteItemRoom dependen
+        // de las habitaciones. Si no se tocan los items, se dejan intactos aunque
+        // pierdan el vínculo con las habitaciones antiguas eliminadas.
+        if (willRecreateItems) {
+          await tx.quoteItem.deleteMany({ where: { quoteId: id } });
+        }
+        await tx.room.deleteMany({ where: { quoteId: id } });
+        for (const [index, room] of rooms.entries()) {
+          const created = await tx.room.create({
+            data: {
+              quoteId: id,
+              name: room.name,
+              length: room.length,
+              width: room.width,
+              height: room.height,
+              sortOrder: index,
+              openings: {
+                create: room.openings.map((o, oIndex) => ({
+                  type: o.type,
+                  width: o.width,
+                  height: o.height,
+                  quantity: o.quantity,
+                  sortOrder: oIndex,
+                })),
+              },
+            },
+          });
+          if (room.id) roomIdMap.set(room.id, created.id);
+        }
+      } else if (willRecreateItems) {
+        // Sin cambios en habitaciones: recupera el mapeo id->id tal cual para
+        // poder seguir vinculando items a las habitaciones existentes.
+        const existingRooms = await tx.room.findMany({ where: { quoteId: id } });
+        roomIdMap = new Map(existingRooms.map((r) => [r.id, r.id]));
         await tx.quoteItem.deleteMany({ where: { quoteId: id } });
+      }
+
+      if (willRecreateItems && items) {
         for (const [index, item] of items.entries()) {
+          const roomIds = item.roomIds
+            .map((rid) => roomIdMap.get(rid))
+            .filter((rid): rid is string => Boolean(rid));
+
           await tx.quoteItem.create({
             data: {
               quoteId: id,
@@ -68,9 +114,12 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
               workerCount: item.workerCount,
               hoursPerWorker: item.hoursPerWorker,
               hourlyRate: item.hourlyRate,
+              internalHourlyRate: item.internalHourlyRate,
               discountType: item.discountType,
               discountValue: item.discountValue,
               companyCost: item.companyCost,
+              measurementSource: item.measurementSource,
+              subtractOpeningWidths: item.subtractOpeningWidths,
               sortOrder: index,
               materials: {
                 create: item.materials.map((m, mIndex) => ({
@@ -81,8 +130,18 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
                   unit: m.unit,
                   purchasePrice: m.purchasePrice,
                   marginPercent: m.marginPercent,
+                  calcType: m.calcType,
+                  coveragePerUnit: m.coveragePerUnit,
+                  coats: m.coats,
+                  wastePercent: m.wastePercent,
+                  packageSize: m.packageSize,
+                  containerSizes: m.containerSizes ?? undefined,
+                  calculatedQuantity: m.calculatedQuantity,
                   sortOrder: mIndex,
                 })),
+              },
+              rooms: {
+                create: roomIds.map((roomId) => ({ roomId })),
               },
             },
           });

@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { formatMoney, pricingMethodLabel, unitLabel } from "@/lib/utils/format";
-import { newId, type ItemDraft } from "@/lib/quotes/draft-types";
+import { emptyItem, type ItemDraft } from "@/lib/quotes/draft-types";
 
 export interface PriceListOption {
   id: string;
@@ -38,7 +38,7 @@ export function JobPickerModal({
 
   function pick(option: PriceListOption) {
     const item: ItemDraft = {
-      id: newId("item"),
+      ...emptyItem(),
       priceListItemId: option.id,
       categoryName: option.categoryName,
       name: option.name,
@@ -46,10 +46,6 @@ export function JobPickerModal({
       unit: option.unit,
       quantity: 1,
       unitPrice: option.defaultUnitPrice,
-      useDetailedLabor: false,
-      discountType: "NONE",
-      discountValue: 0,
-      materials: [],
     };
     onSelect(item);
     onClose();
@@ -57,18 +53,7 @@ export function JobPickerModal({
   }
 
   function pickBlank() {
-    onSelect({
-      id: newId("item"),
-      name: "",
-      pricingMethod: "FIXED",
-      unit: "UNIT",
-      quantity: 1,
-      unitPrice: 0,
-      useDetailedLabor: false,
-      discountType: "NONE",
-      discountValue: 0,
-      materials: [],
-    });
+    onSelect(emptyItem());
     onClose();
     setSearch("");
   }

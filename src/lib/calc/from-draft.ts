@@ -19,6 +19,7 @@ export function draftToCalcInput(draft: QuoteDraft): CalcQuoteInput {
       workerCount: item.workerCount,
       hoursPerWorker: item.hoursPerWorker,
       hourlyRate: item.hourlyRate,
+      internalHourlyRate: item.internalHourlyRate,
       quantity: item.quantity,
       unitPrice: item.unitPrice,
       discountType: item.discountType,

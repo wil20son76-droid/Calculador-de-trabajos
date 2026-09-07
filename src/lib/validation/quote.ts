@@ -13,6 +13,33 @@ export const QUOTE_STATUSES = [
   "COMPLETED",
   "INVOICED",
 ] as const;
+export const MEASUREMENT_SOURCES = [
+  "NONE",
+  "NET_WALL",
+  "GROSS_WALL",
+  "CEILING",
+  "FLOOR",
+  "PERIMETER",
+] as const;
+export const MATERIAL_CALC_TYPES = ["NONE", "PAINT", "COVERAGE", "PACKAGE"] as const;
+export const OPENING_TYPES = ["DOOR", "WINDOW", "OTHER"] as const;
+
+export const roomOpeningSchema = z.object({
+  id: z.string().optional(),
+  type: z.enum(OPENING_TYPES).default("DOOR"),
+  width: z.coerce.number().min(0),
+  height: z.coerce.number().min(0),
+  quantity: z.coerce.number().int().min(1).default(1),
+});
+
+export const roomSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1),
+  length: z.coerce.number().min(0),
+  width: z.coerce.number().min(0),
+  height: z.coerce.number().min(0),
+  openings: z.array(roomOpeningSchema).default([]),
+});
 
 export const quoteMaterialSchema = z.object({
   id: z.string().optional(),
@@ -23,6 +50,13 @@ export const quoteMaterialSchema = z.object({
   unit: z.enum(MATERIAL_UNITS),
   purchasePrice: z.coerce.number().min(0),
   marginPercent: z.coerce.number().min(0),
+  calcType: z.enum(MATERIAL_CALC_TYPES).default("NONE"),
+  coveragePerUnit: z.coerce.number().min(0).optional().nullable(),
+  coats: z.coerce.number().int().min(1).optional().nullable(),
+  wastePercent: z.coerce.number().min(0).default(0),
+  packageSize: z.coerce.number().min(0).optional().nullable(),
+  containerSizes: z.array(z.coerce.number().min(0)).optional().nullable(),
+  calculatedQuantity: z.coerce.number().min(0).optional().nullable(),
 });
 
 export const quoteItemSchema = z.object({
@@ -42,9 +76,13 @@ export const quoteItemSchema = z.object({
   workerCount: z.coerce.number().min(0).optional().nullable(),
   hoursPerWorker: z.coerce.number().min(0).optional().nullable(),
   hourlyRate: z.coerce.number().min(0).optional().nullable(),
+  internalHourlyRate: z.coerce.number().min(0).optional().nullable(),
   discountType: z.enum(DISCOUNT_TYPES).default("NONE"),
   discountValue: z.coerce.number().min(0).default(0),
   companyCost: z.coerce.number().min(0).optional().nullable(),
+  measurementSource: z.enum(MEASUREMENT_SOURCES).default("NONE"),
+  subtractOpeningWidths: z.boolean().default(false),
+  roomIds: z.array(z.string()).default([]),
   materials: z.array(quoteMaterialSchema).default([]),
 });
 
@@ -86,10 +124,13 @@ export const quoteUpdateSchema = z.object({
   termsText: z.string().optional().nullable(),
   notesInternal: z.string().optional().nullable(),
   notesClient: z.string().optional().nullable(),
+  rooms: z.array(roomSchema).optional(),
   items: z.array(quoteItemSchema).optional(),
   otherCosts: z.array(quoteOtherCostSchema).optional(),
 });
 
+export type RoomInput = z.infer<typeof roomSchema>;
+export type RoomOpeningInput = z.infer<typeof roomOpeningSchema>;
 export type QuoteItemInput = z.infer<typeof quoteItemSchema>;
 export type QuoteMaterialInput = z.infer<typeof quoteMaterialSchema>;
 export type QuoteOtherCostInput = z.infer<typeof quoteOtherCostSchema>;

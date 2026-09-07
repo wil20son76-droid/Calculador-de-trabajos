@@ -17,11 +17,13 @@ export interface CalcItemInput {
   workerCount?: number | null;
   hoursPerWorker?: number | null;
   hourlyRate?: number | null;
+  /** Coste interno real por hora (p.ej. salario pagado), distinto del precio/hora facturado. */
+  internalHourlyRate?: number | null;
   quantity: number;
   unitPrice: number;
   discountType: DiscountType;
   discountValue: number;
-  /** Coste interno de la empresa para esta línea (p.ej. salarios), nunca visible al cliente. */
+  /** Coste interno adicional de la empresa para esta línea, nunca visible al cliente. */
   companyCost?: number | null;
   materials: CalcMaterialInput[];
 }
@@ -66,6 +68,8 @@ export interface CalcItemResult {
   materialsNet: number;
   lineTotal: number;
   materialsCost: number;
+  /** Coste interno de mano de obra (horas × precio interno/h), separado del de materiales. */
+  laborCostInternal: number;
   costInternal: number;
   materials: CalcMaterialResult[];
 }
@@ -91,6 +95,9 @@ export interface CalcQuoteResult {
   totalDue: number;
 
   // Solo para uso interno de la empresa — nunca debe mostrarse en el PDF de cliente.
+  // Venta / coste mano de obra / coste materiales / otros costes / beneficio / margen.
+  laborCostInternal: number;
+  materialCostInternal: number;
   totalCostInternal: number;
   grossProfit: number;
   marginPercent: number;

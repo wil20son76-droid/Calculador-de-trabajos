@@ -2,7 +2,7 @@
 
 import { Modal } from "@/components/ui/modal";
 import { formatMoney } from "@/lib/utils/format";
-import { newId, type ItemDraft } from "@/lib/quotes/draft-types";
+import { emptyItem, type ItemDraft } from "@/lib/quotes/draft-types";
 
 export interface TemplateOption {
   id: string;
@@ -31,17 +31,13 @@ export function TemplatePickerModal({
 }) {
   function pick(template: TemplateOption) {
     const items: ItemDraft[] = template.items.map((i) => ({
-      id: newId("item"),
+      ...emptyItem(),
       name: i.name,
       descriptionClient: i.descriptionClient,
       pricingMethod: i.pricingMethod,
       unit: i.unit,
       quantity: i.quantity,
       unitPrice: i.unitPrice,
-      useDetailedLabor: false,
-      discountType: "NONE",
-      discountValue: 0,
-      materials: [],
     }));
     onSelect(items);
     onClose();

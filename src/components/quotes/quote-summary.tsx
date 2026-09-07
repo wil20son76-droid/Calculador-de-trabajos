@@ -84,6 +84,13 @@ export function QuoteSummary({
             </span>
           </div>
           <div className="text-sm">
+            <Row label="Venta" value={money(result.subtotalAfterDiscount)} muted />
+            <Row label="Coste mano de obra" value={money(result.laborCostInternal)} muted />
+            <Row label="Coste materiales" value={money(result.materialCostInternal)} muted />
+            <Row label="Otros costes" value={money(result.otherAfterDiscount)} muted />
+          </div>
+          <div className="my-2 border-t border-amber-200" />
+          <div className="text-sm">
             <Row label="Coste total empresa" value={money(result.totalCostInternal)} muted />
             <Row label="Beneficio bruto" value={money(result.grossProfit)} muted />
             <Row label="Margen" value={`${result.marginPercent.toFixed(1)}%`} muted />

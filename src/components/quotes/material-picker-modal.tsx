@@ -6,7 +6,7 @@ import { Search } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { Button } from "@/components/ui/button";
 import { formatMoney, unitLabel } from "@/lib/utils/format";
-import { newId, type MaterialDraft } from "@/lib/quotes/draft-types";
+import { emptyMaterial, type MaterialDraft } from "@/lib/quotes/draft-types";
 
 export interface MaterialOption {
   id: string;
@@ -14,6 +14,12 @@ export interface MaterialOption {
   unit: MaterialDraft["unit"];
   purchasePrice: number;
   marginPercent: number;
+  calcType: MaterialDraft["calcType"];
+  coveragePerUnit: number | null;
+  coatsDefault: number | null;
+  wastePercentDefault: number;
+  packageSize: number | null;
+  containerSizes: number[] | null;
 }
 
 export function MaterialPickerModal({
@@ -38,27 +44,26 @@ export function MaterialPickerModal({
 
   function pick(option: MaterialOption) {
     onSelect({
-      id: newId("mat"),
+      ...emptyMaterial(),
       materialLibraryItemId: option.id,
       name: option.name,
       quantity: 1,
       unit: option.unit,
       purchasePrice: option.purchasePrice,
       marginPercent: option.marginPercent,
+      calcType: option.calcType,
+      coveragePerUnit: option.coveragePerUnit,
+      coats: option.coatsDefault,
+      wastePercent: option.wastePercentDefault,
+      packageSize: option.packageSize,
+      containerSizes: option.containerSizes,
     });
     onClose();
     setSearch("");
   }
 
   function pickBlank() {
-    onSelect({
-      id: newId("mat"),
-      name: "",
-      quantity: 1,
-      unit: "UNIT",
-      purchasePrice: 0,
-      marginPercent: defaultMargin,
-    });
+    onSelect({ ...emptyMaterial(), marginPercent: defaultMargin });
     onClose();
     setSearch("");
   }

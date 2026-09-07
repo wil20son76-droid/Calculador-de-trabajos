@@ -1,4 +1,12 @@
-import type { DiscountType, PricingMethod, WorkUnit, MaterialUnit } from "@prisma/client";
+import type {
+  DiscountType,
+  PricingMethod,
+  WorkUnit,
+  MaterialUnit,
+  MeasurementSource,
+  MaterialCalcType,
+  OpeningType,
+} from "@prisma/client";
 
 export interface MaterialDraft {
   id: string;
@@ -9,6 +17,13 @@ export interface MaterialDraft {
   unit: MaterialUnit;
   purchasePrice: number;
   marginPercent: number;
+  calcType: MaterialCalcType;
+  coveragePerUnit?: number | null;
+  coats?: number | null;
+  wastePercent: number;
+  packageSize?: number | null;
+  containerSizes?: number[] | null;
+  calculatedQuantity?: number | null;
 }
 
 export interface ItemDraft {
@@ -28,9 +43,13 @@ export interface ItemDraft {
   workerCount?: number | null;
   hoursPerWorker?: number | null;
   hourlyRate?: number | null;
+  internalHourlyRate?: number | null;
   discountType: DiscountType;
   discountValue: number;
   companyCost?: number | null;
+  measurementSource: MeasurementSource;
+  subtractOpeningWidths: boolean;
+  roomIds: string[];
   materials: MaterialDraft[];
 }
 
@@ -39,6 +58,23 @@ export interface OtherCostDraft {
   name: string;
   quantity: number;
   unitPrice: number;
+}
+
+export interface RoomOpeningDraft {
+  id: string;
+  type: OpeningType;
+  width: number;
+  height: number;
+  quantity: number;
+}
+
+export interface RoomDraft {
+  id: string;
+  name: string;
+  length: number;
+  width: number;
+  height: number;
+  openings: RoomOpeningDraft[];
 }
 
 export interface QuoteDraft {
@@ -71,6 +107,7 @@ export interface QuoteDraft {
   termsText: string;
   notesInternal: string;
   notesClient: string;
+  rooms: RoomDraft[];
   items: ItemDraft[];
   otherCosts: OtherCostDraft[];
 }
@@ -89,6 +126,8 @@ export function emptyMaterial(): MaterialDraft {
     unit: "UNIT",
     purchasePrice: 0,
     marginPercent: 15,
+    calcType: "NONE",
+    wastePercent: 0,
   };
 }
 
@@ -103,10 +142,27 @@ export function emptyItem(): ItemDraft {
     useDetailedLabor: false,
     discountType: "NONE",
     discountValue: 0,
+    measurementSource: "NONE",
+    subtractOpeningWidths: false,
+    roomIds: [],
     materials: [],
   };
 }
 
 export function emptyOtherCost(): OtherCostDraft {
   return { id: newId("cost"), name: "", quantity: 1, unitPrice: 0 };
+}
+
+export function emptyRoom(): RoomDraft {
+  return { id: newId("room"), name: "", length: 0, width: 0, height: 2.5, openings: [] };
+}
+
+export function emptyOpening(type: OpeningType = "DOOR"): RoomOpeningDraft {
+  return {
+    id: newId("opening"),
+    type,
+    width: type === "DOOR" ? 0.9 : 1.2,
+    height: type === "DOOR" ? 2.1 : 1.2,
+    quantity: 1,
+  };
 }

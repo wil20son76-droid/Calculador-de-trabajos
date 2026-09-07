@@ -71,6 +71,20 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
     termsText: quote.termsText ?? "",
     notesInternal: quote.notesInternal ?? "",
     notesClient: quote.notesClient ?? "",
+    rooms: quote.rooms.map((room) => ({
+      id: room.id,
+      name: room.name,
+      length: Number(room.length),
+      width: Number(room.width),
+      height: Number(room.height),
+      openings: room.openings.map((o) => ({
+        id: o.id,
+        type: o.type,
+        width: Number(o.width),
+        height: Number(o.height),
+        quantity: o.quantity,
+      })),
+    })),
     items: quote.items.map((item) => ({
       id: item.id,
       priceListItemId: item.priceListItemId,
@@ -88,9 +102,13 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
       workerCount: item.workerCount != null ? Number(item.workerCount) : null,
       hoursPerWorker: item.hoursPerWorker != null ? Number(item.hoursPerWorker) : null,
       hourlyRate: item.hourlyRate != null ? Number(item.hourlyRate) : null,
+      internalHourlyRate: item.internalHourlyRate != null ? Number(item.internalHourlyRate) : null,
       discountType: item.discountType,
       discountValue: Number(item.discountValue),
       companyCost: item.companyCost != null ? Number(item.companyCost) : null,
+      measurementSource: item.measurementSource,
+      subtractOpeningWidths: item.subtractOpeningWidths,
+      roomIds: item.rooms.map((r) => r.roomId),
       materials: item.materials.map((m) => ({
         id: m.id,
         materialLibraryItemId: m.materialLibraryItemId,
@@ -100,6 +118,13 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
         unit: m.unit,
         purchasePrice: Number(m.purchasePrice),
         marginPercent: Number(m.marginPercent),
+        calcType: m.calcType,
+        coveragePerUnit: m.coveragePerUnit != null ? Number(m.coveragePerUnit) : null,
+        coats: m.coats,
+        wastePercent: Number(m.wastePercent),
+        packageSize: m.packageSize != null ? Number(m.packageSize) : null,
+        containerSizes: Array.isArray(m.containerSizes) ? (m.containerSizes as number[]) : null,
+        calculatedQuantity: m.calculatedQuantity != null ? Number(m.calculatedQuantity) : null,
       })),
     })),
     otherCosts: quote.otherCosts.map((c) => ({
@@ -126,6 +151,12 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
     unit: m.unit,
     purchasePrice: Number(m.purchasePrice),
     marginPercent: Number(m.marginPercent),
+    calcType: m.calcType,
+    coveragePerUnit: m.coveragePerUnit != null ? Number(m.coveragePerUnit) : null,
+    coatsDefault: m.coatsDefault,
+    wastePercentDefault: Number(m.wastePercentDefault),
+    packageSize: m.packageSize != null ? Number(m.packageSize) : null,
+    containerSizes: Array.isArray(m.containerSizes) ? (m.containerSizes as number[]) : null,
   }));
 
   return (

@@ -66,15 +66,6 @@ export const SEED_TEMPLATES: SeedTemplate[] = [
     ],
   },
   {
-    name: "Construcción terraza",
-    description: "Terraza/altan completa: estructura, tarima y barandillas",
-    items: [
-      { name: "Construcción de estructura", pricingMethod: "PER_M2", unit: "M2", quantity: 25, unitPrice: 850 },
-      { name: "Montaje de tarima", pricingMethod: "PER_M2", unit: "M2", quantity: 25, unitPrice: 450 },
-      { name: "Barandillas", pricingMethod: "PER_METER", unit: "METER", quantity: 10, unitPrice: 950 },
-    ],
-  },
-  {
     name: "Pintura fachada",
     description: "Lavado, raspado y pintura completa de fachada exterior",
     items: [

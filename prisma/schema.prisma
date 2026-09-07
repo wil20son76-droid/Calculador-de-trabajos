@@ -15,7 +15,7 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 model Company {
-  id      String @id @default(cuid())
+  id      String  @id @default(cuid())
   name    String
   logoUrl String?
 
@@ -37,27 +37,27 @@ model Company {
   currency String @default("SEK")
   locale   String @default("sv") // idioma por defecto de la interfaz para esta empresa
 
-  vatRatePercent               Decimal @default(25) @db.Decimal(6, 3)
-  rotEnabledDefault             Boolean @default(true)
-  rotPercent                    Decimal @default(50) @db.Decimal(6, 3) // % deducible sobre mano de obra, configurable (cambia con la ley)
-  rotMaxDeductionPerQuote       Decimal? @db.Decimal(12, 2) // tope opcional, configurable
-  defaultHourlyRate             Decimal @default(0) @db.Decimal(12, 2)
-  defaultMaterialMarginPercent  Decimal @default(0) @db.Decimal(6, 3)
-  quoteValidityDays             Int     @default(30)
-  defaultTermsText              String? @db.Text
-  nextQuoteSequence             Int     @default(1) // contador para generar OFF-YYYY-XXX
+  vatRatePercent               Decimal  @default(25) @db.Decimal(6, 3)
+  rotEnabledDefault            Boolean  @default(true)
+  rotPercent                   Decimal  @default(50) @db.Decimal(6, 3) // % deducible sobre mano de obra, configurable (cambia con la ley)
+  rotMaxDeductionPerQuote      Decimal? @db.Decimal(12, 2) // tope opcional, configurable
+  defaultHourlyRate            Decimal  @default(0) @db.Decimal(12, 2)
+  defaultMaterialMarginPercent Decimal  @default(0) @db.Decimal(6, 3)
+  quoteValidityDays            Int      @default(30)
+  defaultTermsText             String?  @db.Text
+  nextQuoteSequence            Int      @default(1) // contador para generar OFF-YYYY-XXX
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users             User[]
-  customers         Customer[]
-  projects          Project[]
-  quotes            Quote[]
-  jobCategories     JobCategory[]
-  priceListItems    PriceListItem[]
-  materialLibrary   MaterialLibraryItem[]
-  templates         Template[]
+  users           User[]
+  customers       Customer[]
+  projects        Project[]
+  quotes          Quote[]
+  jobCategories   JobCategory[]
+  priceListItems  PriceListItem[]
+  materialLibrary MaterialLibraryItem[]
+  templates       Template[]
 }
 
 enum UserRole {
@@ -86,8 +86,8 @@ model Customer {
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  firstName String
-  lastName  String?
+  firstName   String
+  lastName    String?
   companyName String? // empresa del cliente, si corresponde
 
   address    String?
@@ -124,14 +124,14 @@ model Project {
   customerId String
   customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
 
-  name    String
-  address String?
+  name       String
+  address    String?
   postalCode String?
-  city    String?
-  status  ProjectStatus @default(PLANNING)
-  startDate DateTime?
-  endDate   DateTime?
-  notes   String? @db.Text
+  city       String?
+  status     ProjectStatus @default(PLANNING)
+  startDate  DateTime?
+  endDate    DateTime?
+  notes      String?       @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -143,18 +143,69 @@ model Project {
 }
 
 // ---------------------------------------------------------------------------
+// Habitaciones / zonas y mediciones (calculador de habitaciones)
+// ---------------------------------------------------------------------------
+
+enum OpeningType {
+  DOOR
+  WINDOW
+  OTHER
+}
+
+// Habitación o zona dentro de un presupuesto: guarda las dimensiones brutas.
+// El resto de medidas (suelo, techo, perímetro, paredes brutas/netas) se derivan
+// siempre a partir de estos valores en el motor de cálculo — nunca se guardan
+// duplicadas, para que reflejen siempre el estado actual de la habitación.
+model Room {
+  id      String @id @default(cuid())
+  quoteId String
+  quote   Quote  @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  name   String
+  length Decimal @db.Decimal(8, 3) // largo, metros
+  width  Decimal @db.Decimal(8, 3) // ancho, metros
+  height Decimal @db.Decimal(8, 3) // altura, metros
+
+  sortOrder Int @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  openings  RoomOpening[]
+  itemLinks QuoteItemRoom[]
+
+  @@index([quoteId])
+}
+
+// Puertas / ventanas / otras aberturas a descontar de las paredes de una habitación.
+model RoomOpening {
+  id     String      @id @default(cuid())
+  roomId String
+  room   Room        @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  type   OpeningType @default(DOOR)
+
+  width    Decimal @db.Decimal(8, 3)
+  height   Decimal @db.Decimal(8, 3)
+  quantity Int     @default(1)
+
+  sortOrder Int @default(0)
+
+  @@index([roomId])
+}
+
+// ---------------------------------------------------------------------------
 // Bibliotecas reutilizables: categorías de trabajo, lista de precios, materiales
 // ---------------------------------------------------------------------------
 
 model JobCategory {
-  id        String  @id @default(cuid())
+  id        String   @id @default(cuid())
   companyId String?
   company   Company? @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
   key       String // slug estable, ej "painting-interior"
   name      String
   nameSv    String?
-  sortOrder Int    @default(0)
+  sortOrder Int     @default(0)
 
   priceListItems PriceListItem[]
 
@@ -162,9 +213,9 @@ model JobCategory {
 }
 
 enum PricingMethod {
-  FIXED   // precio fijo
-  HOURLY  // por hora
-  PER_M2  // por metro cuadrado
+  FIXED // precio fijo
+  HOURLY // por hora
+  PER_M2 // por metro cuadrado
   PER_METER // por metro lineal
   PER_UNIT // por unidad
   PER_DAY // por día
@@ -195,14 +246,14 @@ model PriceListItem {
   categoryId String?
   category   JobCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 
-  name            String
-  nameSv          String?
-  description     String? @db.Text
-  pricingMethod   PricingMethod @default(FIXED)
-  unit            WorkUnit      @default(UNIT)
-  defaultUnitPrice Decimal      @default(0) @db.Decimal(12, 2)
-  defaultHourlyRate Decimal?    @db.Decimal(12, 2)
-  isSystem        Boolean @default(false) // seed vs. creado por el usuario
+  name              String
+  nameSv            String?
+  description       String?       @db.Text
+  pricingMethod     PricingMethod @default(FIXED)
+  unit              WorkUnit      @default(UNIT)
+  defaultUnitPrice  Decimal       @default(0) @db.Decimal(12, 2)
+  defaultHourlyRate Decimal?      @db.Decimal(12, 2)
+  isSystem          Boolean       @default(false) // seed vs. creado por el usuario
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -227,19 +278,36 @@ enum MaterialUnit {
   ROLL
 }
 
+// Cómo se calcula automáticamente la cantidad necesaria de un material a partir
+// de una superficie/longitud (sección "cálculo automático de pintura y suelos").
+enum MaterialCalcType {
+  NONE // cantidad siempre manual
+  PAINT // litros = (área × manos / rendimiento) × (1 + desperdicio), con sugerencia de envases
+  COVERAGE // consumo por m² (pegamento, barniz, imprimación...): área × consumo, con desperdicio opcional
+  PACKAGE // superficie en paquetes (parquet, laminado...): ceil((área × (1+desperdicio)) / m² por paquete)
+}
+
 // Biblioteca de materiales (sección 12)
 model MaterialLibraryItem {
   id        String  @id @default(cuid())
   companyId String
   company   Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
-  name           String
-  description    String?
-  unit           MaterialUnit @default(UNIT)
-  purchasePrice  Decimal      @default(0) @db.Decimal(12, 2)
-  marginPercent  Decimal      @default(0) @db.Decimal(6, 3)
-  supplier       String?
-  sku            String?
+  name          String
+  description   String?
+  unit          MaterialUnit @default(UNIT)
+  purchasePrice Decimal      @default(0) @db.Decimal(12, 2)
+  marginPercent Decimal      @default(0) @db.Decimal(6, 3)
+  supplier      String?
+  sku           String?
+
+  // Valores por defecto para el cálculo automático (editables en cada presupuesto)
+  calcType            MaterialCalcType @default(NONE)
+  coveragePerUnit     Decimal?         @db.Decimal(10, 3) // rendimiento: m² por litro/kg
+  coatsDefault        Int? // manos por defecto (pintura/barniz)
+  wastePercentDefault Decimal          @default(0) @db.Decimal(6, 3)
+  packageSize         Decimal?         @db.Decimal(10, 3) // tamaño de envase/paquete en la unidad natural (L, kg, m²)
+  containerSizes      Json? // tamaños de envase disponibles, p.ej. [1,2.7,5,9,10] (litros)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -320,14 +388,14 @@ model Quote {
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
 
   // Datos del proyecto / obra
-  projectName        String?
-  projectDescription String? @db.Text
+  projectName          String?
+  projectDescription   String? @db.Text
   siteAddressDifferent Boolean @default(false)
-  siteAddress        String?
-  sitePostalCode     String?
-  siteCity           String?
+  siteAddress          String?
+  sitePostalCode       String?
+  siteCity             String?
 
-  quoteDate  DateTime @default(now())
+  quoteDate  DateTime  @default(now())
   validUntil DateTime?
 
   currency String @default("SEK")
@@ -343,19 +411,19 @@ model Quote {
   materialMarginDefaultPercent Decimal @default(0) @db.Decimal(6, 3)
 
   // Visibilidad del PDF (sección 20) — el margen/beneficio interno NUNCA se muestra
-  showHours                Boolean @default(true)
-  showHourlyRate           Boolean @default(true)
+  showHours                 Boolean @default(true)
+  showHourlyRate            Boolean @default(true)
   showMaterialsIndividually Boolean @default(true)
-  showMaterialPrices       Boolean @default(true)
-  showUnitPrice            Boolean @default(true)
-  showOnlyTotalPerJob      Boolean @default(false)
-  showMaterialsOnPdf       Boolean @default(true)
+  showMaterialPrices        Boolean @default(true)
+  showUnitPrice             Boolean @default(true)
+  showOnlyTotalPerJob       Boolean @default(false)
+  showMaterialsOnPdf        Boolean @default(true)
 
-  includedText   String? @db.Text
-  excludedText   String? @db.Text
-  termsText      String? @db.Text
-  notesInternal  String? @db.Text
-  notesClient    String? @db.Text
+  includedText  String? @db.Text
+  excludedText  String? @db.Text
+  termsText     String? @db.Text
+  notesInternal String? @db.Text
+  notesClient   String? @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -363,25 +431,37 @@ model Quote {
   // Totales calculados en el servidor (motor de cálculo) y cacheados aquí para
   // listados y dashboard. Los items siguen siendo la fuente de la verdad: estos
   // campos se recalculan siempre que se guarda el presupuesto.
-  cachedLaborTotal    Decimal @default(0) @db.Decimal(12, 2)
-  cachedMaterialTotal Decimal @default(0) @db.Decimal(12, 2)
-  cachedOtherTotal    Decimal @default(0) @db.Decimal(12, 2)
-  cachedSubtotal      Decimal @default(0) @db.Decimal(12, 2)
-  cachedVatAmount     Decimal @default(0) @db.Decimal(12, 2)
-  cachedTotalInclVat  Decimal @default(0) @db.Decimal(12, 2)
-  cachedRotDeduction  Decimal @default(0) @db.Decimal(12, 2)
-  cachedTotalDue      Decimal @default(0) @db.Decimal(12, 2)
-  cachedCostInternal  Decimal @default(0) @db.Decimal(12, 2)
-  cachedGrossProfit   Decimal @default(0) @db.Decimal(12, 2)
-  cachedMarginPercent Decimal @default(0) @db.Decimal(6, 2)
+  cachedLaborTotal           Decimal @default(0) @db.Decimal(12, 2)
+  cachedMaterialTotal        Decimal @default(0) @db.Decimal(12, 2)
+  cachedOtherTotal           Decimal @default(0) @db.Decimal(12, 2)
+  cachedSubtotal             Decimal @default(0) @db.Decimal(12, 2)
+  cachedVatAmount            Decimal @default(0) @db.Decimal(12, 2)
+  cachedTotalInclVat         Decimal @default(0) @db.Decimal(12, 2)
+  cachedRotDeduction         Decimal @default(0) @db.Decimal(12, 2)
+  cachedTotalDue             Decimal @default(0) @db.Decimal(12, 2)
+  cachedCostInternal         Decimal @default(0) @db.Decimal(12, 2)
+  cachedLaborCostInternal    Decimal @default(0) @db.Decimal(12, 2)
+  cachedMaterialCostInternal Decimal @default(0) @db.Decimal(12, 2)
+  cachedGrossProfit          Decimal @default(0) @db.Decimal(12, 2)
+  cachedMarginPercent        Decimal @default(0) @db.Decimal(6, 2)
 
   items      QuoteItem[]
   otherCosts QuoteOtherCost[]
+  rooms      Room[]
 
   @@unique([companyId, quoteNumber])
   @@index([companyId])
   @@index([customerId])
   @@index([status])
+}
+
+enum MeasurementSource {
+  NONE // cantidad introducida manualmente
+  NET_WALL // paredes netas (bruto - puertas/ventanas) de las habitaciones seleccionadas
+  GROSS_WALL // paredes brutas (sin descontar aberturas)
+  CEILING // techo (= superficie de suelo)
+  FLOOR // suelo
+  PERIMETER // perímetro, opcionalmente menos el ancho de las puertas (rodapiés)
 }
 
 // Línea de trabajo dentro de un presupuesto (sección 3, 4, 16, 17)
@@ -410,17 +490,25 @@ model QuoteItem {
   unitPrice Decimal @default(0) @db.Decimal(12, 2)
 
   // Modo horas (sección 4): si se usa, quantity/unitPrice se derivan de estas horas
-  useDetailedLabor Boolean @default(false)
+  useDetailedLabor Boolean  @default(false)
   workerCount      Decimal? @db.Decimal(8, 2)
   hoursPerWorker   Decimal? @db.Decimal(8, 2)
   hourlyRate       Decimal? @db.Decimal(12, 2)
 
+  // Coste interno real por hora (p.ej. salario/hora pagado al trabajador), distinto
+  // del precio/hora facturado al cliente. Solo se usa junto con useDetailedLabor.
+  internalHourlyRate Decimal? @db.Decimal(12, 2)
+
   discountType  DiscountType @default(NONE)
   discountValue Decimal      @default(0) @db.Decimal(12, 2)
 
-  // Coste interno de la empresa para esta línea (p.ej. salarios reales pagados).
+  // Coste interno adicional de la empresa para esta línea (p.ej. subcontratas).
   // Uso exclusivamente interno: nunca se expone en el PDF del cliente.
   companyCost Decimal? @db.Decimal(12, 2)
+
+  // Calculador de habitaciones: de dónde se obtiene la cantidad (sección "reutilizar mediciones")
+  measurementSource     MeasurementSource @default(NONE)
+  subtractOpeningWidths Boolean           @default(false) // para rodapiés: restar ancho de puertas del perímetro
 
   sortOrder Int @default(0)
 
@@ -428,9 +516,24 @@ model QuoteItem {
   updatedAt DateTime @updatedAt
 
   materials QuoteMaterial[]
+  rooms     QuoteItemRoom[]
 
   @@index([quoteId])
   @@index([priceListItemId])
+}
+
+// Habitaciones seleccionadas como origen de medición para una línea de trabajo.
+// Varias habitaciones pueden sumarse (p.ej. "Salón + dormitorios + pasillo").
+model QuoteItemRoom {
+  id          String    @id @default(cuid())
+  quoteItemId String
+  quoteItem   QuoteItem @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
+  roomId      String
+  room        Room      @relation(fields: [roomId], references: [id], onDelete: Cascade)
+
+  @@unique([quoteItemId, roomId])
+  @@index([quoteItemId])
+  @@index([roomId])
 }
 
 // Material asociado a una línea de trabajo (sección 5, 6)
@@ -444,10 +547,21 @@ model QuoteMaterial {
 
   name          String
   description   String?
-  quantity      Decimal      @default(1) @db.Decimal(12, 3)
+  quantity      Decimal      @default(1) @db.Decimal(12, 3) // cantidad final presupuestada/a comprar
   unit          MaterialUnit @default(UNIT)
   purchasePrice Decimal      @default(0) @db.Decimal(12, 2)
   marginPercent Decimal      @default(0) @db.Decimal(6, 3)
+
+  // Cálculo automático a partir de la medición de la línea (habitaciones seleccionadas)
+  calcType           MaterialCalcType @default(NONE)
+  coveragePerUnit    Decimal?         @db.Decimal(10, 3)
+  coats              Int?
+  wastePercent       Decimal          @default(0) @db.Decimal(6, 3)
+  packageSize        Decimal?         @db.Decimal(10, 3)
+  containerSizes     Json?
+  // Última cantidad calculada automáticamente (en la unidad natural: L, kg, m²), para
+  // poder detectar y avisar si difiere de `quantity` tras cambiar una habitación.
+  calculatedQuantity Decimal?         @db.Decimal(12, 3)
 
   sortOrder Int @default(0)
 

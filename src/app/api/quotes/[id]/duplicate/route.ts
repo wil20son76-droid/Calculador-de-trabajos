@@ -54,8 +54,50 @@ export async function POST(_req: NextRequest, { params }: RouteContext<"/api/quo
         excludedText: original.excludedText,
         termsText: original.termsText,
         notesClient: original.notesClient,
-        items: {
-          create: original.items.map((item) => ({
+        otherCosts: {
+          create: original.otherCosts.map((c) => ({
+            name: c.name,
+            quantity: c.quantity,
+            unitPrice: c.unitPrice,
+            sortOrder: c.sortOrder,
+          })),
+        },
+      },
+    });
+
+    await prisma.$transaction(async (tx) => {
+      const roomIdMap = new Map<string, string>();
+      for (const room of original.rooms) {
+        const createdRoom = await tx.room.create({
+          data: {
+            quoteId: copy.id,
+            name: room.name,
+            length: room.length,
+            width: room.width,
+            height: room.height,
+            sortOrder: room.sortOrder,
+            openings: {
+              create: room.openings.map((o) => ({
+                type: o.type,
+                width: o.width,
+                height: o.height,
+                quantity: o.quantity,
+                sortOrder: o.sortOrder,
+              })),
+            },
+          },
+        });
+        roomIdMap.set(room.id, createdRoom.id);
+      }
+
+      for (const item of original.items) {
+        const newRoomIds = item.rooms
+          .map((link) => roomIdMap.get(link.roomId))
+          .filter((rid): rid is string => Boolean(rid));
+
+        await tx.quoteItem.create({
+          data: {
+            quoteId: copy.id,
             priceListItemId: item.priceListItemId,
             categoryName: item.categoryName,
             name: item.name,
@@ -71,9 +113,12 @@ export async function POST(_req: NextRequest, { params }: RouteContext<"/api/quo
             workerCount: item.workerCount,
             hoursPerWorker: item.hoursPerWorker,
             hourlyRate: item.hourlyRate,
+            internalHourlyRate: item.internalHourlyRate,
             discountType: item.discountType,
             discountValue: item.discountValue,
             companyCost: item.companyCost,
+            measurementSource: item.measurementSource,
+            subtractOpeningWidths: item.subtractOpeningWidths,
             sortOrder: item.sortOrder,
             materials: {
               create: item.materials.map((m) => ({
@@ -84,20 +129,22 @@ export async function POST(_req: NextRequest, { params }: RouteContext<"/api/quo
                 unit: m.unit,
                 purchasePrice: m.purchasePrice,
                 marginPercent: m.marginPercent,
+                calcType: m.calcType,
+                coveragePerUnit: m.coveragePerUnit,
+                coats: m.coats,
+                wastePercent: m.wastePercent,
+                packageSize: m.packageSize,
+                containerSizes: m.containerSizes ?? undefined,
+                calculatedQuantity: m.calculatedQuantity,
                 sortOrder: m.sortOrder,
               })),
             },
-          })),
-        },
-        otherCosts: {
-          create: original.otherCosts.map((c) => ({
-            name: c.name,
-            quantity: c.quantity,
-            unitPrice: c.unitPrice,
-            sortOrder: c.sortOrder,
-          })),
-        },
-      },
+            rooms: {
+              create: newRoomIds.map((roomId) => ({ roomId })),
+            },
+          },
+        });
+      }
     });
 
     await recomputeAndCacheQuote(copy.id);

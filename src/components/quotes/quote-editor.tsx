@@ -25,6 +25,7 @@ import type { ItemDraft, QuoteDraft } from "@/lib/quotes/draft-types";
 import { emptyOtherCost } from "@/lib/quotes/draft-types";
 import { QuoteItemRow } from "./quote-item-row";
 import { QuoteSummary } from "./quote-summary";
+import { RoomManager } from "./room-manager";
 import { JobPickerModal, type PriceListOption } from "./job-picker-modal";
 import type { MaterialOption } from "./material-picker-modal";
 import { TemplatePickerModal, type TemplateOption } from "./template-picker-modal";
@@ -104,6 +105,7 @@ export function QuoteEditor({
         termsText: data.termsText,
         notesInternal: data.notesInternal,
         notesClient: data.notesClient,
+        rooms: data.rooms,
         items: data.items,
         otherCosts: data.otherCosts,
       };
@@ -344,6 +346,9 @@ export function QuoteEditor({
             </div>
           </Card>
 
+          {/* Calculador de habitaciones */}
+          <RoomManager rooms={draft.rooms} onChange={(rooms) => update("rooms", rooms)} />
+
           {/* Trabajos */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -364,7 +369,12 @@ export function QuoteEditor({
               </Card>
             )}
 
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+            <DndContext
+              id="quote-items-dnd"
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
               <SortableContext
                 items={draft.items.map((i) => i.id)}
                 strategy={verticalListSortingStrategy}
@@ -378,6 +388,7 @@ export function QuoteEditor({
                       currency={draft.currency}
                       materialLibrary={materialLibrary}
                       defaultMargin={draft.materialMarginDefaultPercent}
+                      rooms={draft.rooms}
                       onChange={updateItem}
                       onRemove={() => removeItem(item.id)}
                       onDuplicate={() => duplicateItem(item.id)}
