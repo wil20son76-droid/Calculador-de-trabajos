@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Company } from "@prisma/client";
 import bcrypt from "bcryptjs";
 
 import { SEED_CATEGORIES } from "./seed-data/categories";
@@ -12,6 +12,12 @@ import {
 import { computeMaterialAutoCalc } from "../src/lib/calc/materials-auto";
 
 const prisma = new PrismaClient();
+
+// Por defecto se siembran también clientes y presupuestos de ejemplo (útil en
+// desarrollo local). Para inicializar una base nueva en producción (p.ej.
+// Railway) sin datos de demostración, ejecuta con SEED_DEMO_DATA=false:
+//   SEED_DEMO_DATA=false npx prisma db seed
+const INCLUDE_DEMO_DATA = process.env.SEED_DEMO_DATA !== "false";
 
 async function main() {
   console.log("Sembrando base de datos...");
@@ -180,6 +186,24 @@ async function main() {
     });
   }
 
+  // ---------------------------------------------------------------------
+  // Clientes y presupuestos de ejemplo (opcional, ver INCLUDE_DEMO_DATA arriba)
+  // ---------------------------------------------------------------------
+  if (INCLUDE_DEMO_DATA) {
+    await seedDemoData(company);
+  } else {
+    console.log("SEED_DEMO_DATA=false: se omiten clientes y presupuestos de ejemplo.");
+  }
+
+  console.log("Seed completado.");
+  console.log("Login demo: admin@reformas.se / demo1234");
+}
+
+/**
+ * Clientes y presupuestos de ejemplo, solo para desarrollo/demo local. No se
+ * ejecuta cuando SEED_DEMO_DATA=false (p.ej. al inicializar Railway).
+ */
+async function seedDemoData(company: Company) {
   // ---------------------------------------------------------------------
   // Clientes de ejemplo
   // ---------------------------------------------------------------------
@@ -704,9 +728,6 @@ async function main() {
   const { recomputeAndCacheQuote } = await import("../src/lib/quotes/service");
   await recomputeAndCacheQuote(quote1.id);
   await recomputeAndCacheQuote(quote2.id);
-
-  console.log("Seed completado.");
-  console.log("Login demo: admin@reformas.se / demo1234");
 }
 
 main()
