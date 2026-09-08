@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { renderToBuffer } from "@react-pdf/renderer";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { QUOTE_FULL_INCLUDE, toCalcInput } from "@/lib/quotes/service";
 import { calcQuote, calcItem } from "@/lib/calc/engine";
@@ -11,11 +11,11 @@ import { QuotePdfDocument, type PdfItem } from "@/lib/pdf/quote-document";
 
 export async function GET(_req: NextRequest, { params }: RouteContext<"/api/quotes/[id]/pdf">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
 
     const quote = await prisma.quote.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId: companyId },
       include: QUOTE_FULL_INCLUDE,
     });
     if (!quote) {
@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: RouteContext<"/api/quot
     }
 
     const company = await prisma.company.findUniqueOrThrow({
-      where: { id: session.user.companyId },
+      where: { id: companyId },
     });
 
     const calcInput = toCalcInput(quote);
@@ -67,15 +67,15 @@ export async function GET(_req: NextRequest, { params }: RouteContext<"/api/quot
           swish: company.swish,
         },
         customer: {
-          firstName: quote.customer.firstName,
-          lastName: quote.customer.lastName,
-          companyName: quote.customer.companyName,
-          address: quote.customer.address,
-          postalCode: quote.customer.postalCode,
-          city: quote.customer.city,
-          phone: quote.customer.phone,
-          email: quote.customer.email,
-          personalOrgNumber: quote.customer.personalOrgNumber,
+          firstName: quote.customer?.firstName ?? "",
+          lastName: quote.customer?.lastName ?? null,
+          companyName: quote.customer?.companyName ?? null,
+          address: quote.customer?.address ?? null,
+          postalCode: quote.customer?.postalCode ?? null,
+          city: quote.customer?.city ?? null,
+          phone: quote.customer?.phone ?? null,
+          email: quote.customer?.email ?? null,
+          personalOrgNumber: quote.customer?.personalOrgNumber ?? null,
         },
         quoteNumber: quote.quoteNumber,
         quoteDate: formatDate(quote.quoteDate),

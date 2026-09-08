@@ -1,12 +1,12 @@
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { TemplateManager } from "@/components/templates/template-manager";
 
 export default async function TemplatesPage() {
-  const session = await requireSession();
+  const companyId = await getCompanyId();
 
   const templates = await prisma.template.findMany({
-    where: { companyId: session.user.companyId },
+    where: { companyId: companyId },
     include: { items: { orderBy: { sortOrder: "asc" } } },
     orderBy: { name: "asc" },
   });

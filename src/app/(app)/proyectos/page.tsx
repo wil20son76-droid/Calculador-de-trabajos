@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { Folder } from "lucide-react";
 
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney, formatDate, quoteStatusLabel, quoteStatusColor } from "@/lib/utils/format";
 
 export default async function ProjectsPage() {
-  const session = await requireSession();
+  const companyId = await getCompanyId();
 
   const quotes = await prisma.quote.findMany({
     where: {
-      companyId: session.user.companyId,
+      companyId: companyId,
       status: { in: ["ACCEPTED", "IN_PROGRESS", "COMPLETED", "INVOICED"] },
     },
     include: { customer: true },
@@ -45,10 +45,10 @@ export default async function ProjectsPage() {
                   <Badge className={quoteStatusColor(q.status)}>{quoteStatusLabel(q.status)}</Badge>
                 </div>
                 <p className="text-sm text-slate-500">
-                  {q.customer.firstName} {q.customer.lastName ?? ""}
+                  {q.customer ? `${q.customer.firstName} ${q.customer.lastName ?? ""}` : ""}
                 </p>
                 <p className="text-xs text-slate-400">
-                  {q.siteAddressDifferent ? q.siteAddress : q.customer.address}
+                  {q.siteAddressDifferent ? q.siteAddress : q.customer?.address}
                 </p>
                 <div className="mt-3 flex items-center justify-between text-sm">
                   <span className="text-slate-400">{formatDate(q.quoteDate)}</span>

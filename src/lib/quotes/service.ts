@@ -50,6 +50,7 @@ export function toCalcInput(quote: QuoteWithRelations): CalcQuoteInput {
       discountType: item.discountType,
       discountValue: toNumber(item.discountValue),
       companyCost: item.companyCost != null ? toNumber(item.companyCost) : null,
+      rotEligible: item.rotEligible,
       materials: item.materials.map((m) => ({
         id: m.id,
         quantity: toNumber(m.quantity),

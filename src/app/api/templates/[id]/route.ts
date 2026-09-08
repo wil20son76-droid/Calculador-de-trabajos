@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { templateSchema } from "@/lib/validation/template";
 
 export async function GET(_req: NextRequest, { params }: RouteContext<"/api/templates/[id]">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
 
     const template = await prisma.template.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId: companyId },
       include: { items: { orderBy: { sortOrder: "asc" } } },
     });
     if (!template) {
@@ -25,12 +25,12 @@ export async function GET(_req: NextRequest, { params }: RouteContext<"/api/temp
 
 export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/templates/[id]">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
     const body = templateSchema.parse(await req.json());
 
     const existing = await prisma.template.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId: companyId },
     });
     if (!existing) {
       return NextResponse.json({ error: "No encontrada" }, { status: 404 });
@@ -70,11 +70,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/tem
 
 export async function DELETE(_req: NextRequest, { params }: RouteContext<"/api/templates/[id]">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
 
     const existing = await prisma.template.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId: companyId },
     });
     if (!existing) {
       return NextResponse.json({ error: "No encontrada" }, { status: 404 });

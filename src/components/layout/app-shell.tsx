@@ -7,11 +7,9 @@ import { Sidebar } from "./sidebar";
 
 export function AppShell({
   companyName,
-  userName,
   children,
 }: {
   companyName: string;
-  userName: string;
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -20,7 +18,6 @@ export function AppShell({
     <div className="flex min-h-screen">
       <Sidebar
         companyName={companyName}
-        userName={userName}
         open={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
       />

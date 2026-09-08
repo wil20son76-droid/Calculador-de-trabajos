@@ -2,33 +2,28 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { generateQuoteNumber } from "@/lib/quotes/service";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const q = req.nextUrl.searchParams.get("q")?.trim();
-    const status = req.nextUrl.searchParams.get("status")?.trim();
 
     const quotes = await prisma.quote.findMany({
       where: {
-        companyId: session.user.companyId,
-        ...(status ? { status: status as never } : {}),
+        companyId: companyId,
         ...(q
           ? {
               OR: [
-                { quoteNumber: { contains: q, mode: "insensitive" } },
                 { projectName: { contains: q, mode: "insensitive" } },
-                { customer: { firstName: { contains: q, mode: "insensitive" } } },
-                { customer: { lastName: { contains: q, mode: "insensitive" } } },
-                { customer: { companyName: { contains: q, mode: "insensitive" } } },
+                { siteAddress: { contains: q, mode: "insensitive" } },
+                { quoteNumber: { contains: q, mode: "insensitive" } },
               ],
             }
           : {}),
       },
-      include: { customer: true },
       orderBy: { createdAt: "desc" },
     });
 
@@ -38,40 +33,57 @@ export async function GET(req: NextRequest) {
   }
 }
 
-const createQuoteSchema = z.object({ customerId: z.string().min(1) });
+const createQuoteSchema = z.object({
+  projectName: z.string().min(1, "El nombre del trabajo es obligatorio"),
+  siteAddress: z.string().optional().nullable(),
+  notesInternal: z.string().optional().nullable(),
+  quoteDate: z.string().optional().nullable(),
+  categoryName: z.string().optional().nullable(),
+});
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await requireSession();
-    const { customerId } = createQuoteSchema.parse(await req.json());
+    const companyId = await getCompanyId();
+    const body = createQuoteSchema.parse(await req.json());
 
-    const [company, customer] = await Promise.all([
-      prisma.company.findUniqueOrThrow({ where: { id: session.user.companyId } }),
-      prisma.customer.findFirst({
-        where: { id: customerId, companyId: session.user.companyId },
-      }),
-    ]);
-    if (!customer) {
-      return NextResponse.json({ error: "Cliente no encontrado" }, { status: 404 });
-    }
+    const company = await prisma.company.findUniqueOrThrow({ where: { id: companyId } });
 
-    const quoteNumber = await generateQuoteNumber(session.user.companyId);
-    const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + company.quoteValidityDays);
+    const quoteNumber = await generateQuoteNumber(companyId);
 
     const quote = await prisma.quote.create({
       data: {
-        companyId: session.user.companyId,
+        companyId: companyId,
         quoteNumber,
-        customerId: customer.id,
         status: "DRAFT",
-        validUntil,
+        projectName: body.projectName,
+        siteAddress: body.siteAddress || null,
+        notesInternal: body.notesInternal || null,
+        quoteDate: body.quoteDate ? new Date(body.quoteDate) : new Date(),
         currency: company.currency,
         vatRatePercent: company.vatRatePercent,
         rotEnabled: company.rotEnabledDefault,
         rotPercent: company.rotPercent,
         materialMarginDefaultPercent: company.defaultMaterialMarginPercent,
-        termsText: company.defaultTermsText,
+        ...(body.categoryName
+          ? {
+              items: {
+                create: [
+                  {
+                    categoryName: body.categoryName,
+                    name: body.categoryName,
+                    pricingMethod: "PER_M2",
+                    unit: "M2",
+                    quantity: 0,
+                    unitPrice: 0,
+                    internalHourlyRate: company.defaultInternalHourlyRate,
+                    hourlyRate: company.defaultHourlyRate,
+                    rotEligible: true,
+                    sortOrder: 0,
+                  },
+                ],
+              },
+            }
+          : {}),
       },
     });
 

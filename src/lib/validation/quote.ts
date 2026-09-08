@@ -34,7 +34,10 @@ export const roomOpeningSchema = z.object({
 
 export const roomSchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(1),
+  // Una habitación recién añadida empieza sin nombre (el usuario lo rellena
+  // después, p.ej. "Salón"), así que no puede exigirse aquí: si se exigiera,
+  // el autoguardado fallaría en cuanto se añade una habitación.
+  name: z.string().default(""),
   length: z.coerce.number().min(0),
   width: z.coerce.number().min(0),
   height: z.coerce.number().min(0),
@@ -63,11 +66,12 @@ export const quoteItemSchema = z.object({
   id: z.string().optional(),
   priceListItemId: z.string().optional().nullable(),
   categoryName: z.string().optional().nullable(),
-  name: z.string().min(1),
+  // Un trabajo personalizado ("+ Agregar trabajo personalizado") empieza sin
+  // nombre y se autoguarda antes de que el usuario lo rellene, así que no
+  // puede exigirse aquí (rompería el autoguardado justo al añadirlo).
+  name: z.string().default(""),
   descriptionInternal: z.string().optional().nullable(),
   descriptionClient: z.string().optional().nullable(),
-  includedText: z.string().optional().nullable(),
-  excludedText: z.string().optional().nullable(),
   pricingMethod: z.enum(PRICING_METHODS),
   unit: z.enum(WORK_UNITS),
   quantity: z.coerce.number().min(0),
@@ -80,6 +84,7 @@ export const quoteItemSchema = z.object({
   discountType: z.enum(DISCOUNT_TYPES).default("NONE"),
   discountValue: z.coerce.number().min(0).default(0),
   companyCost: z.coerce.number().min(0).optional().nullable(),
+  rotEligible: z.boolean().default(true),
   measurementSource: z.enum(MEASUREMENT_SOURCES).default("NONE"),
   subtractOpeningWidths: z.boolean().default(false),
   roomIds: z.array(z.string()).default([]),
@@ -88,7 +93,8 @@ export const quoteItemSchema = z.object({
 
 export const quoteOtherCostSchema = z.object({
   id: z.string().optional(),
-  name: z.string().min(1),
+  // Igual que en items/habitaciones: se crea vacío y se rellena después.
+  name: z.string().default(""),
   quantity: z.coerce.number().min(0),
   unitPrice: z.coerce.number().min(0),
 });

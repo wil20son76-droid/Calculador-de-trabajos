@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Users } from "lucide-react";
 
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { Button } from "@/components/ui/button";
 import { SearchBox } from "@/components/shared/search-box";
@@ -9,13 +9,13 @@ import { SearchBox } from "@/components/shared/search-box";
 export default async function CustomersPage({
   searchParams,
 }: PageProps<"/clientes">) {
-  const session = await requireSession();
+  const companyId = await getCompanyId();
   const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim() : "";
 
   const customers = await prisma.customer.findMany({
     where: {
-      companyId: session.user.companyId,
+      companyId: companyId,
       ...(query
         ? {
             OR: [

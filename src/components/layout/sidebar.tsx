@@ -2,41 +2,25 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { signOut } from "next-auth/react";
-import {
-  LayoutDashboard,
-  FileText,
-  Users,
-  Folder,
-  Tag,
-  Package,
-  Layers,
-  Settings,
-  LogOut,
-  X,
-} from "lucide-react";
+import { Home, PlusCircle, ListChecks, Tag, Package, Settings, X } from "lucide-react";
 
 import { cn } from "@/lib/utils/cn";
 
 const NAV_ITEMS = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/presupuestos", label: "Presupuestos", icon: FileText },
-  { href: "/clientes", label: "Clientes", icon: Users },
-  { href: "/proyectos", label: "Proyectos", icon: Folder },
-  { href: "/precios", label: "Lista de precios", icon: Tag },
+  { href: "/", label: "Inicio", icon: Home },
+  { href: "/presupuestos/nuevo", label: "Nuevo cálculo", icon: PlusCircle },
+  { href: "/presupuestos", label: "Mis cálculos", icon: ListChecks },
+  { href: "/precios", label: "Precios", icon: Tag },
   { href: "/materiales", label: "Materiales", icon: Package },
-  { href: "/plantillas", label: "Plantillas", icon: Layers },
   { href: "/configuracion", label: "Configuración", icon: Settings },
 ];
 
 export function Sidebar({
   companyName,
-  userName,
   open,
   onClose,
 }: {
   companyName: string;
-  userName: string;
   open: boolean;
   onClose: () => void;
 }) {
@@ -59,13 +43,13 @@ export function Sidebar({
         <div className="flex items-center justify-between px-5 py-5">
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-              O
+              K
             </div>
             <div>
               <p className="text-sm font-semibold leading-tight text-slate-900">
                 {companyName}
               </p>
-              <p className="text-xs text-slate-400">Offert & Kalkyl</p>
+              <p className="text-xs text-slate-400">Kalkylverktyg</p>
             </div>
           </div>
           <button
@@ -100,15 +84,8 @@ export function Sidebar({
           })}
         </nav>
 
-        <div className="border-t border-slate-200 px-3 py-3">
-          <div className="mb-2 truncate px-3 text-xs text-slate-400">{userName}</div>
-          <button
-            onClick={() => signOut({ callbackUrl: "/login" })}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-100 hover:text-red-600"
-          >
-            <LogOut className="h-[18px] w-[18px]" />
-            Cerrar sesión
-          </button>
+        <div className="border-t border-slate-200 px-5 py-3 text-xs text-slate-400">
+          Herramienta interna · datos oficiales en Fortnox
         </div>
       </aside>
     </>

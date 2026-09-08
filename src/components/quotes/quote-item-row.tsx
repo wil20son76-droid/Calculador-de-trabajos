@@ -85,6 +85,7 @@ export function QuoteItemRow({
     discountType: item.discountType,
     discountValue: item.discountValue,
     companyCost: item.companyCost,
+    rotEligible: item.rotEligible,
     materials: item.materials.map((m) => ({
       id: m.id,
       quantity: m.quantity,
@@ -113,6 +114,12 @@ export function QuoteItemRow({
       ? item.roomIds.filter((id) => id !== roomId)
       : [...item.roomIds, roomId];
     update("roomIds", next);
+  }
+
+  const allRoomsSelected = rooms.length > 0 && rooms.every((r) => item.roomIds.includes(r.id));
+
+  function toggleAllRooms() {
+    update("roomIds", allRoomsSelected ? [] : rooms.map((r) => r.id));
   }
 
   function updateMaterial(materialId: string, patch: Partial<MaterialDraft>) {
@@ -262,6 +269,18 @@ export function QuoteItemRow({
               {item.measurementSource !== "NONE" && (
                 <>
                   <div className="mt-2 flex flex-wrap gap-1.5">
+                    <button
+                      type="button"
+                      onClick={toggleAllRooms}
+                      className={
+                        "rounded-full border px-2.5 py-1 text-xs font-medium " +
+                        (allRoomsSelected
+                          ? "border-blue-300 bg-blue-100 text-blue-700"
+                          : "border-dashed border-slate-300 bg-white text-slate-500 hover:bg-slate-100")
+                      }
+                    >
+                      Todo el proyecto
+                    </button>
                     {rooms.map((r) => (
                       <button
                         key={r.id}
@@ -304,14 +323,27 @@ export function QuoteItemRow({
             </div>
           )}
 
-          <label className="flex items-center gap-2 text-xs text-slate-500">
-            <input
-              type="checkbox"
-              checked={item.useDetailedLabor}
-              onChange={(e) => update("useDetailedLabor", e.target.checked)}
-            />
-            Calcular por horas de mano de obra (trabajadores × horas × precio/h)
-          </label>
+          <div className="flex flex-wrap items-center gap-4">
+            <label className="flex items-center gap-2 text-xs text-slate-500">
+              <input
+                type="checkbox"
+                checked={item.useDetailedLabor}
+                onChange={(e) => update("useDetailedLabor", e.target.checked)}
+              />
+              Calcular por horas de mano de obra (trabajadores × horas × precio/h)
+            </label>
+            <label
+              className="flex items-center gap-2 text-xs font-medium text-slate-600"
+              title="Si la mano de obra de este trabajo es elegible para el ROT-avdrag"
+            >
+              <input
+                type="checkbox"
+                checked={item.rotEligible}
+                onChange={(e) => update("rotEligible", e.target.checked)}
+              />
+              ROT-berättigad
+            </label>
+          </div>
 
           {item.useDetailedLabor && (
             <div className="grid grid-cols-4 gap-2 rounded-lg bg-slate-50 p-3">
@@ -354,32 +386,18 @@ export function QuoteItemRow({
           {expanded && (
             <div className="space-y-4 border-t border-slate-100 pt-3">
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <Field label="Descripción para el cliente (visible en PDF)">
+                <Field label="Descripción (detalle para Fortnox)">
                   <Textarea
                     rows={2}
                     value={item.descriptionClient ?? ""}
                     onChange={(e) => update("descriptionClient", e.target.value)}
                   />
                 </Field>
-                <Field label="Descripción interna (nunca visible al cliente)">
+                <Field label="Notas internas (nunca se copian a Fortnox)">
                   <Textarea
                     rows={2}
                     value={item.descriptionInternal ?? ""}
                     onChange={(e) => update("descriptionInternal", e.target.value)}
-                  />
-                </Field>
-                <Field label="Incluido en el precio">
-                  <Textarea
-                    rows={2}
-                    value={item.includedText ?? ""}
-                    onChange={(e) => update("includedText", e.target.value)}
-                  />
-                </Field>
-                <Field label="No incluido en el precio">
-                  <Textarea
-                    rows={2}
-                    value={item.excludedText ?? ""}
-                    onChange={(e) => update("excludedText", e.target.value)}
                   />
                 </Field>
               </div>

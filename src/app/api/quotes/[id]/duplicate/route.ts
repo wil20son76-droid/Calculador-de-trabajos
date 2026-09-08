@@ -1,30 +1,30 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { QUOTE_FULL_INCLUDE, generateQuoteNumber, recomputeAndCacheQuote } from "@/lib/quotes/service";
 
 export async function POST(_req: NextRequest, { params }: RouteContext<"/api/quotes/[id]/duplicate">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
 
     const original = await prisma.quote.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId: companyId },
       include: QUOTE_FULL_INCLUDE,
     });
     if (!original) {
       return NextResponse.json({ error: "Presupuesto no encontrado" }, { status: 404 });
     }
 
-    const quoteNumber = await generateQuoteNumber(session.user.companyId);
+    const quoteNumber = await generateQuoteNumber(companyId);
     const validUntil = new Date();
     validUntil.setDate(validUntil.getDate() + 30);
 
     const copy = await prisma.quote.create({
       data: {
-        companyId: session.user.companyId,
+        companyId: companyId,
         quoteNumber,
         status: "DRAFT",
         customerId: original.customerId,
@@ -103,8 +103,6 @@ export async function POST(_req: NextRequest, { params }: RouteContext<"/api/quo
             name: item.name,
             descriptionInternal: item.descriptionInternal,
             descriptionClient: item.descriptionClient,
-            includedText: item.includedText,
-            excludedText: item.excludedText,
             pricingMethod: item.pricingMethod,
             unit: item.unit,
             quantity: item.quantity,
@@ -117,6 +115,7 @@ export async function POST(_req: NextRequest, { params }: RouteContext<"/api/quo
             discountType: item.discountType,
             discountValue: item.discountValue,
             companyCost: item.companyCost,
+            rotEligible: item.rotEligible,
             measurementSource: item.measurementSource,
             subtractOpeningWidths: item.subtractOpeningWidths,
             sortOrder: item.sortOrder,

@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { CustomerForm } from "@/components/customers/customer-form";
 import { Badge } from "@/components/ui/badge";
 import { formatMoney, formatDate, quoteStatusLabel, quoteStatusColor } from "@/lib/utils/format";
 
 export default async function EditCustomerPage({ params }: PageProps<"/clientes/[id]">) {
-  const session = await requireSession();
+  const companyId = await getCompanyId();
   const { id } = await params;
 
   const customer = await prisma.customer.findFirst({
-    where: { id, companyId: session.user.companyId },
+    where: { id, companyId: companyId },
     include: { quotes: { orderBy: { createdAt: "desc" } } },
   });
 

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { templateSchema } from "@/lib/validation/template";
 
 export async function GET() {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const templates = await prisma.template.findMany({
-      where: { companyId: session.user.companyId },
+      where: { companyId: companyId },
       include: { items: { orderBy: { sortOrder: "asc" } } },
       orderBy: { name: "asc" },
     });
@@ -21,12 +21,12 @@ export async function GET() {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const body = templateSchema.parse(await req.json());
 
     const template = await prisma.template.create({
       data: {
-        companyId: session.user.companyId,
+        companyId: companyId,
         name: body.name,
         description: body.description,
         items: {

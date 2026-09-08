@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { customerSchema } from "@/lib/validation/customer";
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const q = req.nextUrl.searchParams.get("q")?.trim();
 
     const customers = await prisma.customer.findMany({
       where: {
-        companyId: session.user.companyId,
+        companyId: companyId,
         ...(q
           ? {
               OR: [
@@ -38,11 +38,11 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const body = customerSchema.parse(await req.json());
 
     const customer = await prisma.customer.create({
-      data: { ...body, companyId: session.user.companyId },
+      data: { ...body, companyId: companyId },
     });
 
     return NextResponse.json(customer, { status: 201 });

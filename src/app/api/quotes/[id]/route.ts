@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { quoteUpdateSchema } from "@/lib/validation/quote";
 import { QUOTE_FULL_INCLUDE, recomputeAndCacheQuote, toCalcInput } from "@/lib/quotes/service";
@@ -13,11 +13,11 @@ async function loadOwnedQuote(id: string, companyId: string) {
 
 export async function GET(_req: NextRequest, { params }: RouteContext<"/api/quotes/[id]">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
 
     const quote = await prisma.quote.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId: companyId },
       include: QUOTE_FULL_INCLUDE,
     });
     if (!quote) {
@@ -33,11 +33,11 @@ export async function GET(_req: NextRequest, { params }: RouteContext<"/api/quot
 
 export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quotes/[id]">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
     const body = quoteUpdateSchema.parse(await req.json());
 
-    const existing = await loadOwnedQuote(id, session.user.companyId);
+    const existing = await loadOwnedQuote(id, companyId);
     if (!existing) {
       return NextResponse.json({ error: "Presupuesto no encontrado" }, { status: 404 });
     }
@@ -104,8 +104,6 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
               name: item.name,
               descriptionInternal: item.descriptionInternal,
               descriptionClient: item.descriptionClient,
-              includedText: item.includedText,
-              excludedText: item.excludedText,
               pricingMethod: item.pricingMethod,
               unit: item.unit,
               quantity: item.quantity,
@@ -118,6 +116,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
               discountType: item.discountType,
               discountValue: item.discountValue,
               companyCost: item.companyCost,
+              rotEligible: item.rotEligible,
               measurementSource: item.measurementSource,
               subtractOpeningWidths: item.subtractOpeningWidths,
               sortOrder: index,
@@ -178,10 +177,10 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
 
 export async function DELETE(_req: NextRequest, { params }: RouteContext<"/api/quotes/[id]">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
 
-    const existing = await loadOwnedQuote(id, session.user.companyId);
+    const existing = await loadOwnedQuote(id, companyId);
     if (!existing) {
       return NextResponse.json({ error: "Presupuesto no encontrado" }, { status: 404 });
     }

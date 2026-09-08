@@ -1,18 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { materialLibraryItemSchema } from "@/lib/validation/material";
 
 export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/materials/[id]">) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
     const body = materialLibraryItemSchema.partial().parse(await req.json());
 
     const existing = await prisma.materialLibraryItem.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId: companyId },
     });
     if (!existing) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });
@@ -30,11 +30,11 @@ export async function DELETE(
   { params }: RouteContext<"/api/materials/[id]">
 ) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const { id } = await params;
 
     const existing = await prisma.materialLibraryItem.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId: companyId },
     });
     if (!existing) {
       return NextResponse.json({ error: "No encontrado" }, { status: 404 });

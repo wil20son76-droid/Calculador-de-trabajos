@@ -1,118 +1,96 @@
 import Link from "next/link";
-import { FileText, TrendingUp, CheckCircle2, Clock, Target, DollarSign } from "lucide-react";
+import { Plus, PaintRoller, Sun, LayoutGrid, ChefHat, Bath, Hammer } from "lucide-react";
 
-import { requireSession } from "@/lib/auth/session";
-import { getDashboardStats } from "@/lib/quotes/stats";
-import { StatCard } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { getCompanyId } from "@/lib/auth/session";
+import { prisma } from "@/lib/db/prisma";
+import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { formatMoney, formatDate, quoteStatusLabel, quoteStatusColor } from "@/lib/utils/format";
+import { formatMoney, formatDate } from "@/lib/utils/format";
 
-export default async function DashboardPage() {
-  const session = await requireSession();
-  const stats = await getDashboardStats(session.user.companyId);
+const QUICK_CATEGORIES = [
+  { name: "Pintura interior", icon: PaintRoller },
+  { name: "Pintura exterior", icon: Sun },
+  { name: "Suelos", icon: LayoutGrid },
+  { name: "Cocina", icon: ChefHat },
+  { name: "Baño", icon: Bath },
+  { name: "Reforma general", icon: Hammer },
+];
+
+export default async function HomePage() {
+  const companyId = await getCompanyId();
+
+  const recentQuotes = await prisma.quote.findMany({
+    where: { companyId },
+    orderBy: { updatedAt: "desc" },
+    take: 6,
+    include: { items: { select: { categoryName: true }, take: 1 } },
+  });
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Dashboard</h1>
-          <p className="text-sm text-slate-500">Resumen de tu actividad comercial</p>
+    <div className="space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold text-slate-900">Inicio</h1>
+        <p className="text-sm text-slate-500">Herramienta interna de cálculo de trabajos</p>
+      </div>
+
+      <Card className="flex flex-col items-center gap-3 border-blue-200 bg-blue-50/60 py-10 text-center">
+        <Button href="/presupuestos/nuevo" className="gap-2 px-8 py-3 text-base">
+          <Plus className="h-5 w-5" />
+          NUEVO CÁLCULO
+        </Button>
+        <p className="text-sm text-slate-500">
+          Superficies, materiales, desperdicio, horas, coste y precio de venta
+        </p>
+      </Card>
+
+      <div>
+        <h2 className="mb-3 text-sm font-semibold text-slate-900">Empezar desde una categoría</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {QUICK_CATEGORIES.map(({ name, icon: Icon }) => (
+            <Link
+              key={name}
+              href={`/presupuestos/nuevo?categoria=${encodeURIComponent(name)}`}
+              className="flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-center shadow-sm transition hover:border-blue-300 hover:shadow-md"
+            >
+              <Icon className="h-6 w-6 text-blue-600" />
+              <span className="text-xs font-medium text-slate-700">{name}</span>
+            </Link>
+          ))}
         </div>
-        <Button href="/presupuestos/nuevo">+ Nuevo presupuesto</Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <StatCard
-          label="Presupuestos este mes"
-          value={String(stats.monthlyQuotesCount)}
-          icon={FileText}
-        />
-        <StatCard
-          label="Valor total presupuestado (mes)"
-          value={formatMoney(stats.totalQuotedThisMonth)}
-          icon={TrendingUp}
-        />
-        <StatCard
-          label="Presupuestos aceptados"
-          value={String(stats.acceptedAllTime)}
-          icon={CheckCircle2}
-        />
-        <StatCard
-          label="Presupuestos pendientes"
-          value={String(stats.pendingCount)}
-          hint="Borrador o enviado"
-          icon={Clock}
-        />
-        <StatCard
-          label="Tasa de aceptación"
-          value={`${stats.acceptanceRate.toFixed(0)}%`}
-          icon={Target}
-        />
-        <StatCard
-          label="Facturación potencial"
-          value={formatMoney(stats.potentialRevenue)}
-          hint="Presupuestos enviados, pendientes de respuesta"
-          icon={DollarSign}
-        />
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
-          <h2 className="text-sm font-semibold text-slate-900">Últimos presupuestos</h2>
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-900">Cálculos recientes</h2>
           <Link href="/presupuestos" className="text-sm font-medium text-blue-600 hover:underline">
             Ver todos
           </Link>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-slate-100 text-left text-xs uppercase tracking-wide text-slate-400">
-                <th className="px-5 py-3 font-medium">Número</th>
-                <th className="px-5 py-3 font-medium">Cliente</th>
-                <th className="px-5 py-3 font-medium">Fecha</th>
-                <th className="px-5 py-3 font-medium">Importe</th>
-                <th className="px-5 py-3 font-medium">Estado</th>
-              </tr>
-            </thead>
-            <tbody>
-              {stats.recentQuotes.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-slate-400">
-                    Todavía no hay presupuestos.
-                  </td>
-                </tr>
-              )}
-              {stats.recentQuotes.map((quote) => (
-                <tr
-                  key={quote.id}
-                  className="border-b border-slate-50 last:border-0 hover:bg-slate-50"
-                >
-                  <td className="px-5 py-3">
-                    <Link
-                      href={`/presupuestos/${quote.id}`}
-                      className="font-medium text-blue-600 hover:underline"
-                    >
-                      {quote.quoteNumber}
-                    </Link>
-                  </td>
-                  <td className="px-5 py-3 text-slate-700">
-                    {quote.customer.firstName} {quote.customer.lastName ?? ""}
-                  </td>
-                  <td className="px-5 py-3 text-slate-500">{formatDate(quote.quoteDate)}</td>
-                  <td className="px-5 py-3 font-medium text-slate-900">
+
+        {recentQuotes.length === 0 ? (
+          <Card className="py-10 text-center text-slate-400">
+            Todavía no hay cálculos. Empieza con NUEVO CÁLCULO.
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recentQuotes.map((quote) => (
+              <Link key={quote.id} href={`/presupuestos/${quote.id}`}>
+                <Card className="h-full transition hover:border-blue-300 hover:shadow-md">
+                  <p className="font-medium text-slate-900">
+                    {quote.projectName || quote.quoteNumber}
+                  </p>
+                  <p className="mt-0.5 text-xs text-slate-400">
+                    {quote.items[0]?.categoryName ?? "Sin categoría"} ·{" "}
+                    {formatDate(quote.quoteDate)}
+                  </p>
+                  <p className="mt-2 text-sm font-semibold text-slate-800">
                     {formatMoney(Number(quote.cachedTotalDue))}
-                  </td>
-                  <td className="px-5 py-3">
-                    <Badge className={quoteStatusColor(quote.status)}>
-                      {quoteStatusLabel(quote.status)}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+                  </p>
+                </Card>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db/prisma";
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { companySchema } from "@/lib/validation/company";
 
 export async function GET() {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const company = await prisma.company.findUniqueOrThrow({
-      where: { id: session.user.companyId },
+      where: { id: companyId },
     });
     return NextResponse.json(company);
   } catch (error) {
@@ -19,11 +19,11 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   try {
-    const session = await requireSession();
+    const companyId = await getCompanyId();
     const body = companySchema.partial().parse(await req.json());
 
     const company = await prisma.company.update({
-      where: { id: session.user.companyId },
+      where: { id: companyId },
       data: body,
     });
 

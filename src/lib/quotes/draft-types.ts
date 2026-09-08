@@ -33,8 +33,6 @@ export interface ItemDraft {
   name: string;
   descriptionInternal?: string | null;
   descriptionClient?: string | null;
-  includedText?: string | null;
-  excludedText?: string | null;
   pricingMethod: PricingMethod;
   unit: WorkUnit;
   quantity: number;
@@ -47,6 +45,8 @@ export interface ItemDraft {
   discountType: DiscountType;
   discountValue: number;
   companyCost?: number | null;
+  /** ROT-berättigad: si la mano de obra de este trabajo es elegible para el ROT-avdrag. */
+  rotEligible: boolean;
   measurementSource: MeasurementSource;
   subtractOpeningWidths: boolean;
   roomIds: string[];
@@ -78,16 +78,10 @@ export interface RoomDraft {
 }
 
 export interface QuoteDraft {
-  status: string;
-  customerId: string;
   projectName: string;
-  projectDescription: string;
-  siteAddressDifferent: boolean;
   siteAddress: string;
-  sitePostalCode: string;
-  siteCity: string;
+  notesInternal: string;
   quoteDate: string;
-  validUntil: string;
   currency: string;
   vatRatePercent: number;
   rotEnabled: boolean;
@@ -95,18 +89,6 @@ export interface QuoteDraft {
   discountType: DiscountType;
   discountValue: number;
   materialMarginDefaultPercent: number;
-  showHours: boolean;
-  showHourlyRate: boolean;
-  showMaterialsIndividually: boolean;
-  showMaterialPrices: boolean;
-  showUnitPrice: boolean;
-  showOnlyTotalPerJob: boolean;
-  showMaterialsOnPdf: boolean;
-  includedText: string;
-  excludedText: string;
-  termsText: string;
-  notesInternal: string;
-  notesClient: string;
   rooms: RoomDraft[];
   items: ItemDraft[];
   otherCosts: OtherCostDraft[];
@@ -142,6 +124,7 @@ export function emptyItem(): ItemDraft {
     useDetailedLabor: false,
     discountType: "NONE",
     discountValue: 0,
+    rotEligible: true,
     measurementSource: "NONE",
     subtractOpeningWidths: false,
     roomIds: [],

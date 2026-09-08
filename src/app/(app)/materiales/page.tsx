@@ -1,12 +1,12 @@
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { MaterialManager } from "@/components/materials/material-manager";
 
 export default async function MaterialsPage() {
-  const session = await requireSession();
+  const companyId = await getCompanyId();
 
   const materials = await prisma.materialLibraryItem.findMany({
-    where: { companyId: session.user.companyId },
+    where: { companyId: companyId },
     orderBy: { name: "asc" },
   });
 

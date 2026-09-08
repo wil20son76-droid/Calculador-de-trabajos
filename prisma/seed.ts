@@ -45,7 +45,9 @@ async function main() {
       rotEnabledDefault: true,
       rotPercent: 50,
       defaultHourlyRate: 650,
+      defaultInternalHourlyRate: 350,
       defaultMaterialMarginPercent: 15,
+      defaultWastePercent: 10,
       quoteValidityDays: 30,
       defaultTermsText:
         "Oferta válida durante 30 días desde la fecha de emisión. Trabajos adicionales no incluidos en esta oferta se facturarán por separado según acuerdo previo. El material adicional se factura según el consumo real. El calendario de trabajo puede modificarse debido a retrasos de proveedores ajenos a nuestra empresa. El ROT-avdrag está condicionado a la aprobación final de Skatteverket.",

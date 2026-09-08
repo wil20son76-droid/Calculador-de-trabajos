@@ -42,7 +42,9 @@ model Company {
   rotPercent                   Decimal  @default(50) @db.Decimal(6, 3) // % deducible sobre mano de obra, configurable (cambia con la ley)
   rotMaxDeductionPerQuote      Decimal? @db.Decimal(12, 2) // tope opcional, configurable
   defaultHourlyRate            Decimal  @default(0) @db.Decimal(12, 2)
+  defaultInternalHourlyRate    Decimal  @default(0) @db.Decimal(12, 2) // coste interno/hora predeterminado
   defaultMaterialMarginPercent Decimal  @default(0) @db.Decimal(6, 3)
+  defaultWastePercent          Decimal  @default(0) @db.Decimal(6, 3) // desperdicio predeterminado si un material no tiene uno propio
   quoteValidityDays            Int      @default(30)
   defaultTermsText             String?  @db.Text
   nextQuoteSequence            Int      @default(1) // contador para generar OFF-YYYY-XXX
@@ -381,8 +383,11 @@ model Quote {
   quoteNumber String // ej. OFF-2026-001
   status      QuoteStatus @default(DRAFT)
 
-  customerId String
-  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  // Sin gestión de clientes en el flujo principal (los datos oficiales del cliente
+  // se gestionan en Fortnox): el vínculo con Customer es opcional, para no perder
+  // la posibilidad de reactivarlo más adelante.
+  customerId String?
+  customer   Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
 
   projectId String?
   project   Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
@@ -505,6 +510,10 @@ model QuoteItem {
   // Coste interno adicional de la empresa para esta línea (p.ej. subcontratas).
   // Uso exclusivamente interno: nunca se expone en el PDF del cliente.
   companyCost Decimal? @db.Decimal(12, 2)
+
+  // ROT-berättigad: si la mano de obra de esta línea es elegible para la deducción
+  // ROT. Los materiales y otros costes nunca entran en la base del ROT.
+  rotEligible Boolean @default(true)
 
   // Calculador de habitaciones: de dónde se obtiene la cantidad (sección "reutilizar mediciones")
   measurementSource     MeasurementSource @default(NONE)

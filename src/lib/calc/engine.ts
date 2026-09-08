@@ -100,6 +100,7 @@ export function calcItem(item: CalcItemInput): CalcItemResult {
     materialsCost,
     laborCostInternal,
     costInternal,
+    rotEligible: item.rotEligible,
     materials,
   };
 }
@@ -147,9 +148,19 @@ export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
   const vatAmount = round2(subtotalAfterDiscount * (input.vatRatePercent / 100));
   const totalInclVat = round2(subtotalAfterDiscount + vatAmount);
 
+  // Base ROT: solo la mano de obra de los items marcados como ROT-berättigad.
+  // Los materiales y otros costes nunca entran aquí. Se aplica la misma tasa de
+  // descuento global que al resto de la mano de obra, para mantener la coherencia
+  // con laborAfterDiscount sin necesitar prorrateo por item.
+  const rotEligibleLaborSubtotal = round2(
+    items.filter((i) => i.rotEligible).reduce((sum, i) => sum + i.laborNet, 0)
+  );
+  const laborDiscountRate = laborSubtotal > 0 ? laborAfterDiscount / laborSubtotal : 1;
+  const rotEligibleLaborBase = round2(rotEligibleLaborSubtotal * laborDiscountRate);
+
   let rotDeduction = 0;
   if (input.rotEnabled) {
-    rotDeduction = round2(laborAfterDiscount * (input.rotPercent / 100));
+    rotDeduction = round2(rotEligibleLaborBase * (input.rotPercent / 100));
     if (input.rotMaxDeduction != null) {
       rotDeduction = Math.min(rotDeduction, input.rotMaxDeduction);
     }
@@ -179,6 +190,7 @@ export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
     subtotalAfterDiscount,
     vatAmount,
     totalInclVat,
+    rotEligibleLaborBase,
     rotDeduction,
     totalDue,
     laborCostInternal,

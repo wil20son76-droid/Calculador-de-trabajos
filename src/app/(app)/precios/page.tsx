@@ -1,18 +1,18 @@
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { PriceListManager } from "@/components/price-list/price-list-manager";
 
 export default async function PriceListPage() {
-  const session = await requireSession();
+  const companyId = await getCompanyId();
 
   const [items, categories] = await Promise.all([
     prisma.priceListItem.findMany({
-      where: { companyId: session.user.companyId },
+      where: { companyId: companyId },
       include: { category: true },
       orderBy: [{ category: { sortOrder: "asc" } }, { name: "asc" }],
     }),
     prisma.jobCategory.findMany({
-      where: { companyId: session.user.companyId },
+      where: { companyId: companyId },
       orderBy: { sortOrder: "asc" },
     }),
   ]);

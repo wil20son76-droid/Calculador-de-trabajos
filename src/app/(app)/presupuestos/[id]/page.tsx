@@ -1,39 +1,35 @@
 import { notFound } from "next/navigation";
 
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { QUOTE_FULL_INCLUDE } from "@/lib/quotes/service";
 import { QuoteEditor } from "@/components/quotes/quote-editor";
 import type { QuoteDraft } from "@/lib/quotes/draft-types";
 
 export default async function QuoteDetailPage({ params }: PageProps<"/presupuestos/[id]">) {
-  const session = await requireSession();
+  const companyId = await getCompanyId();
   const { id } = await params;
 
-  const [quote, customers, priceListItems, materialLibrary, categories, templates] = await Promise.all([
+  const [quote, priceListItems, materialLibrary, categories, templates] = await Promise.all([
     prisma.quote.findFirst({
-      where: { id, companyId: session.user.companyId },
+      where: { id, companyId },
       include: QUOTE_FULL_INCLUDE,
     }),
-    prisma.customer.findMany({
-      where: { companyId: session.user.companyId },
-      orderBy: { firstName: "asc" },
-    }),
     prisma.priceListItem.findMany({
-      where: { companyId: session.user.companyId },
+      where: { companyId },
       include: { category: true },
       orderBy: { name: "asc" },
     }),
     prisma.materialLibraryItem.findMany({
-      where: { companyId: session.user.companyId },
+      where: { companyId },
       orderBy: { name: "asc" },
     }),
     prisma.jobCategory.findMany({
-      where: { companyId: session.user.companyId },
+      where: { companyId },
       orderBy: { sortOrder: "asc" },
     }),
     prisma.template.findMany({
-      where: { companyId: session.user.companyId },
+      where: { companyId },
       include: { items: { orderBy: { sortOrder: "asc" } } },
       orderBy: { name: "asc" },
     }),
@@ -42,16 +38,10 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
   if (!quote) notFound();
 
   const draft: QuoteDraft = {
-    status: quote.status,
-    customerId: quote.customerId,
     projectName: quote.projectName ?? "",
-    projectDescription: quote.projectDescription ?? "",
-    siteAddressDifferent: quote.siteAddressDifferent,
     siteAddress: quote.siteAddress ?? "",
-    sitePostalCode: quote.sitePostalCode ?? "",
-    siteCity: quote.siteCity ?? "",
+    notesInternal: quote.notesInternal ?? "",
     quoteDate: quote.quoteDate.toISOString().slice(0, 10),
-    validUntil: quote.validUntil ? quote.validUntil.toISOString().slice(0, 10) : "",
     currency: quote.currency,
     vatRatePercent: Number(quote.vatRatePercent),
     rotEnabled: quote.rotEnabled,
@@ -59,18 +49,6 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
     discountType: quote.discountType,
     discountValue: Number(quote.discountValue),
     materialMarginDefaultPercent: Number(quote.materialMarginDefaultPercent),
-    showHours: quote.showHours,
-    showHourlyRate: quote.showHourlyRate,
-    showMaterialsIndividually: quote.showMaterialsIndividually,
-    showMaterialPrices: quote.showMaterialPrices,
-    showUnitPrice: quote.showUnitPrice,
-    showOnlyTotalPerJob: quote.showOnlyTotalPerJob,
-    showMaterialsOnPdf: quote.showMaterialsOnPdf,
-    includedText: quote.includedText ?? "",
-    excludedText: quote.excludedText ?? "",
-    termsText: quote.termsText ?? "",
-    notesInternal: quote.notesInternal ?? "",
-    notesClient: quote.notesClient ?? "",
     rooms: quote.rooms.map((room) => ({
       id: room.id,
       name: room.name,
@@ -92,8 +70,6 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
       name: item.name,
       descriptionInternal: item.descriptionInternal,
       descriptionClient: item.descriptionClient,
-      includedText: item.includedText,
-      excludedText: item.excludedText,
       pricingMethod: item.pricingMethod,
       unit: item.unit,
       quantity: Number(item.quantity),
@@ -106,6 +82,7 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
       discountType: item.discountType,
       discountValue: Number(item.discountValue),
       companyCost: item.companyCost != null ? Number(item.companyCost) : null,
+      rotEligible: item.rotEligible,
       measurementSource: item.measurementSource,
       subtractOpeningWidths: item.subtractOpeningWidths,
       roomIds: item.rooms.map((r) => r.roomId),
@@ -164,14 +141,6 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
       quoteId={quote.id}
       quoteNumber={quote.quoteNumber}
       initialDraft={draft}
-      customers={customers.map((c) => ({
-        id: c.id,
-        firstName: c.firstName,
-        lastName: c.lastName,
-        companyName: c.companyName,
-        address: c.address,
-        city: c.city,
-      }))}
       priceListItems={serializedPriceList}
       categories={categories.map((c) => ({ id: c.id, name: c.name }))}
       materialLibrary={serializedMaterials}

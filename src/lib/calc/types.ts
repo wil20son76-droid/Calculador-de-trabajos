@@ -25,6 +25,8 @@ export interface CalcItemInput {
   discountValue: number;
   /** Coste interno adicional de la empresa para esta línea, nunca visible al cliente. */
   companyCost?: number | null;
+  /** ROT-berättigad: si la mano de obra de esta línea es elegible para el ROT-avdrag. */
+  rotEligible: boolean;
   materials: CalcMaterialInput[];
 }
 
@@ -71,6 +73,7 @@ export interface CalcItemResult {
   /** Coste interno de mano de obra (horas × precio interno/h), separado del de materiales. */
   laborCostInternal: number;
   costInternal: number;
+  rotEligible: boolean;
   materials: CalcMaterialResult[];
 }
 
@@ -91,6 +94,8 @@ export interface CalcQuoteResult {
   vatAmount: number;
   totalInclVat: number;
 
+  /** Base ROT: solo la mano de obra de los items marcados como rotEligible, tras descuentos. */
+  rotEligibleLaborBase: number;
   rotDeduction: number;
   totalDue: number;
 

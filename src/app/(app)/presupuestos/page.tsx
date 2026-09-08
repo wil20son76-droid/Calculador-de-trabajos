@@ -1,68 +1,68 @@
-import { requireSession } from "@/lib/auth/session";
+import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
 import { Button } from "@/components/ui/button";
 import { SearchBox } from "@/components/shared/search-box";
-import { QuoteStatusFilter } from "@/components/quotes/quote-status-filter";
 import { QuoteListTable } from "@/components/quotes/quote-list-table";
-import { QUOTE_STATUSES } from "@/lib/validation/quote";
-import type { Prisma } from "@prisma/client";
 
-export default async function QuotesPage({
-  searchParams,
-}: PageProps<"/presupuestos">) {
-  const session = await requireSession();
-  const { q, status } = await searchParams;
+export default async function QuotesPage({ searchParams }: PageProps<"/presupuestos">) {
+  const companyId = await getCompanyId();
+  const { q } = await searchParams;
   const query = typeof q === "string" ? q.trim() : "";
-  const statusFilter = typeof status === "string" ? status : "";
-
-  const where: Prisma.QuoteWhereInput = {
-    companyId: session.user.companyId,
-    ...(statusFilter && QUOTE_STATUSES.includes(statusFilter as never)
-      ? { status: statusFilter as Prisma.EnumQuoteStatusFilter["equals"] }
-      : {}),
-    ...(query
-      ? {
-          OR: [
-            { quoteNumber: { contains: query, mode: "insensitive" } },
-            { projectName: { contains: query, mode: "insensitive" } },
-            { customer: { firstName: { contains: query, mode: "insensitive" } } },
-            { customer: { lastName: { contains: query, mode: "insensitive" } } },
-          ],
-        }
-      : {}),
-  };
 
   const quotes = await prisma.quote.findMany({
-    where,
-    include: { customer: true },
+    where: {
+      companyId,
+      ...(query
+        ? {
+            OR: [
+              { projectName: { contains: query, mode: "insensitive" as const } },
+              { siteAddress: { contains: query, mode: "insensitive" as const } },
+              { quoteNumber: { contains: query, mode: "insensitive" as const } },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      items: { select: { categoryName: true, quantity: true, unit: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
 
-  const serialized = quotes.map((q) => ({
-    id: q.id,
-    quoteNumber: q.quoteNumber,
-    status: q.status,
-    projectName: q.projectName,
-    quoteDate: q.quoteDate.toISOString(),
-    customerName: `${q.customer.firstName} ${q.customer.lastName ?? ""}`.trim(),
-    siteAddress: q.siteAddressDifferent ? q.siteAddress : q.customer.address,
-    total: Number(q.cachedTotalDue),
-  }));
+  const serialized = quotes.map((q) => {
+    const categoryNames = Array.from(
+      new Set(q.items.map((i) => i.categoryName).filter((c): c is string => !!c))
+    );
+    const surfaceM2 = q.items
+      .filter((i) => i.unit === "M2")
+      .reduce((sum, i) => sum + Number(i.quantity), 0);
+
+    return {
+      id: q.id,
+      quoteNumber: q.quoteNumber,
+      projectName: q.projectName,
+      siteAddress: q.siteAddress,
+      quoteDate: q.quoteDate.toISOString(),
+      jobType: categoryNames.length > 0 ? categoryNames.join(", ") : "—",
+      surfaceM2,
+      laborTotal: Number(q.cachedLaborTotal),
+      materialTotal: Number(q.cachedMaterialTotal),
+      rotEnabled: q.rotEnabled,
+      rotDeduction: Number(q.cachedRotDeduction),
+      total: Number(q.cachedTotalDue),
+    };
+  });
 
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900">Presupuestos</h1>
-          <p className="text-sm text-slate-500">{quotes.length} presupuestos</p>
+          <h1 className="text-2xl font-semibold text-slate-900">Mis cálculos</h1>
+          <p className="text-sm text-slate-500">{quotes.length} cálculos guardados</p>
         </div>
-        <Button href="/presupuestos/nuevo">+ Nuevo presupuesto</Button>
+        <Button href="/presupuestos/nuevo">+ Nuevo cálculo</Button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
-        <SearchBox placeholder="Buscar por número, cliente o proyecto..." />
-        <QuoteStatusFilter />
-      </div>
+      <SearchBox placeholder="Buscar por nombre, dirección o referencia..." />
 
       <QuoteListTable quotes={serialized} />
     </div>
