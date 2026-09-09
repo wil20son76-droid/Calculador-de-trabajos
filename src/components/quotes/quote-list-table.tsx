@@ -18,8 +18,8 @@ interface QuoteRow {
   surfaceM2: number;
   laborTotal: number;
   materialTotal: number;
-  rotEnabled: boolean;
   rotDeduction: number;
+  rutDeduction: number;
   total: number;
 }
 
@@ -92,9 +92,11 @@ export function QuoteListTable({ quotes }: { quotes: QuoteRow[] }) {
               <p className="font-medium text-slate-800">{formatMoney(q.materialTotal)}</p>
             </div>
             <div>
-              <p className="text-[11px] uppercase text-slate-400">ROT</p>
+              <p className="text-[11px] uppercase text-slate-400">ROT/RUT</p>
               <p className="font-medium text-slate-800">
-                {q.rotEnabled && q.rotDeduction > 0 ? `-${formatMoney(q.rotDeduction)}` : "—"}
+                {q.rotDeduction + q.rutDeduction > 0
+                  ? `-${formatMoney(q.rotDeduction + q.rutDeduction)}`
+                  : "—"}
               </p>
             </div>
           </div>

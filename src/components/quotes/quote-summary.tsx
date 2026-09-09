@@ -1,4 +1,5 @@
 import type { CalcQuoteResult } from "@/lib/calc/types";
+import type { CategorySummaryGroup } from "@/lib/calc/category-summary";
 import { formatMoney, formatNumber } from "@/lib/utils/format";
 import { Card } from "@/components/ui/card";
 
@@ -35,23 +36,48 @@ function Row({
 
 export function QuoteSummary({
   result,
-  rotEnabled,
+  categoryGroups,
   currency,
   totalHours,
   effectiveHourlyRate,
   showInternal,
 }: {
   result: CalcQuoteResult;
-  rotEnabled: boolean;
+  categoryGroups: CategorySummaryGroup[];
   currency: string;
   totalHours: number;
   effectiveHourlyRate: number;
   showInternal: boolean;
 }) {
   const money = (v: number) => formatMoney(v, currency);
+  const hasDeduction = result.rotDeduction > 0 || result.rutDeduction > 0;
 
   return (
     <div className="space-y-4">
+      {categoryGroups.length > 1 && (
+        <Card>
+          <h3 className="mb-2 text-sm font-semibold text-slate-900">Resumen por categoría</h3>
+          <div className="divide-y divide-slate-50 text-sm">
+            {categoryGroups.map((group) => (
+              <div key={group.categoryName} className="py-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-medium text-slate-700">{group.categoryName}</span>
+                  <span className="font-semibold text-slate-900">{money(group.subtotal)}</span>
+                </div>
+                <div className="mt-0.5 space-y-0.5 pl-2 text-xs text-slate-400">
+                  {group.lines.map((line) => (
+                    <div key={line.id} className="flex items-center justify-between">
+                      <span>{line.name || "Trabajo"}</span>
+                      <span>{money(line.lineTotal)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </Card>
+      )}
+
       <Card>
         <h3 className="mb-2 text-sm font-semibold text-slate-900">Resumen</h3>
         <div className="divide-y divide-slate-50 text-sm">
@@ -66,17 +92,23 @@ export function QuoteSummary({
           )}
           <Row label="Delsumma (subtotal)" value={money(result.subtotalAfterDiscount)} bold />
           <Row label="Moms" value={money(result.vatAmount)} />
-          <Row label="Total före ROT" value={money(result.totalInclVat)} bold />
-          {rotEnabled && result.rotDeduction > 0 && (
+          <Row label="Totalt före avdrag" value={money(result.totalInclVat)} bold />
+          {result.rotDeduction > 0 && (
             <>
               <Row label="ROT-underlag" value={money(result.rotEligibleLaborBase)} muted />
               <Row label="ROT-avdrag" value={`-${money(result.rotDeduction)}`} negative />
             </>
           )}
+          {result.rutDeduction > 0 && (
+            <>
+              <Row label="RUT-underlag" value={money(result.rutEligibleLaborBase)} muted />
+              <Row label="RUT-avdrag" value={`-${money(result.rutDeduction)}`} negative />
+            </>
+          )}
         </div>
         <div className="my-2 border-t border-slate-200" />
         <Row
-          label={rotEnabled && result.rotDeduction > 0 ? "Att betala efter ROT" : "Att betala"}
+          label={hasDeduction ? "Att betala efter avdrag" : "Att betala"}
           value={money(result.totalDue)}
           bold
         />

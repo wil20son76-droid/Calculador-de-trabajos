@@ -52,11 +52,13 @@ export function CompanyForm({ settings }: { settings: CalcSettingsInput }) {
       </Card>
 
       <Card>
-        <h2 className="mb-1 text-sm font-semibold text-slate-900">Moms y ROT-avdrag</h2>
+        <h2 className="mb-1 text-sm font-semibold text-slate-900">Moms, ROT-avdrag y RUT-avdrag</h2>
         <p className="mb-4 text-xs text-slate-400">
-          Estos porcentajes son configurables porque las normas fiscales suecas (moms, ROT) pueden
-          cambiar. Nunca están fijados en el código. Cada cálculo guarda el % de ROT usado en ese
-          momento, así que los cálculos antiguos no cambian si luego actualizas este valor.
+          Estos porcentajes son configurables porque las normas fiscales suecas (moms, ROT, RUT)
+          pueden cambiar. Nunca están fijados en el código. Cada cálculo guarda el % de ROT y de
+          RUT usados en ese momento, así que los cálculos antiguos no cambian si luego actualizas
+          estos valores. La deducción aplicable (ROT, RUT o ninguna) se elige por cada línea de
+          trabajo, no aquí.
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Moms / IVA %">
@@ -67,12 +69,20 @@ export function CompanyForm({ settings }: { settings: CalcSettingsInput }) {
               onChange={(e) => update("vatRatePercent", Number(e.target.value))}
             />
           </Field>
-          <Field label="ROT % deducible">
+          <Field label="ROT-avdrag %">
             <Input
               type="number"
               step="0.1"
               value={form.rotPercent}
               onChange={(e) => update("rotPercent", Number(e.target.value))}
+            />
+          </Field>
+          <Field label="RUT-avdrag %">
+            <Input
+              type="number"
+              step="0.1"
+              value={form.rutPercent}
+              onChange={(e) => update("rutPercent", Number(e.target.value))}
             />
           </Field>
           <Field label="Tope ROT por cálculo (SEK, opcional)">
@@ -83,16 +93,6 @@ export function CompanyForm({ settings }: { settings: CalcSettingsInput }) {
                 update("rotMaxDeductionPerQuote", e.target.value ? Number(e.target.value) : null)
               }
             />
-          </Field>
-          <Field label="ROT activado por defecto en nuevos cálculos">
-            <label className="flex h-[38px] items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm">
-              <input
-                type="checkbox"
-                checked={form.rotEnabledDefault}
-                onChange={(e) => update("rotEnabledDefault", e.target.checked)}
-              />
-              {form.rotEnabledDefault ? "Sí" : "No"}
-            </label>
           </Field>
         </div>
       </Card>

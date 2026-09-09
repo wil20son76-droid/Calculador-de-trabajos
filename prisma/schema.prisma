@@ -39,7 +39,8 @@ model Company {
 
   vatRatePercent               Decimal  @default(25) @db.Decimal(6, 3)
   rotEnabledDefault            Boolean  @default(true)
-  rotPercent                   Decimal  @default(50) @db.Decimal(6, 3) // % deducible sobre mano de obra, configurable (cambia con la ley)
+  rotPercent                   Decimal  @default(30) @db.Decimal(6, 3) // % deducible sobre mano de obra ROT, configurable (cambia con la ley)
+  rutPercent                   Decimal  @default(50) @db.Decimal(6, 3) // % deducible sobre mano de obra RUT, configurable (cambia con la ley)
   rotMaxDeductionPerQuote      Decimal? @db.Decimal(12, 2) // tope opcional, configurable
   defaultHourlyRate            Decimal  @default(0) @db.Decimal(12, 2)
   defaultInternalHourlyRate    Decimal  @default(0) @db.Decimal(12, 2) // coste interno/hora predeterminado
@@ -405,10 +406,14 @@ model Quote {
 
   currency String @default("SEK")
 
-  // Snapshot de reglas fiscales/comerciales de la empresa en el momento de crear el presupuesto
+  // Snapshot de reglas fiscales/comerciales de la empresa en el momento de crear el presupuesto.
+  // rotEnabled ya no gobierna el cálculo (ver DeductionType en QuoteItem): cada línea decide
+  // individualmente si es ROT, RUT o ninguna. Se conserva la columna por compatibilidad con
+  // presupuestos existentes, pero la deducción real depende solo de las líneas + estos %.
   vatRatePercent Decimal @default(25) @db.Decimal(6, 3)
   rotEnabled     Boolean @default(false)
-  rotPercent     Decimal @default(50) @db.Decimal(6, 3)
+  rotPercent     Decimal @default(30) @db.Decimal(6, 3)
+  rutPercent     Decimal @default(50) @db.Decimal(6, 3)
 
   discountType  DiscountType @default(NONE)
   discountValue Decimal      @default(0) @db.Decimal(12, 2)
@@ -443,6 +448,7 @@ model Quote {
   cachedVatAmount            Decimal @default(0) @db.Decimal(12, 2)
   cachedTotalInclVat         Decimal @default(0) @db.Decimal(12, 2)
   cachedRotDeduction         Decimal @default(0) @db.Decimal(12, 2)
+  cachedRutDeduction         Decimal @default(0) @db.Decimal(12, 2)
   cachedTotalDue             Decimal @default(0) @db.Decimal(12, 2)
   cachedCostInternal         Decimal @default(0) @db.Decimal(12, 2)
   cachedLaborCostInternal    Decimal @default(0) @db.Decimal(12, 2)
@@ -458,6 +464,15 @@ model Quote {
   @@index([companyId])
   @@index([customerId])
   @@index([status])
+}
+
+// Skattereduktion aplicable a la mano de obra de una línea de trabajo: ROT
+// (reparación/reforma), RUT (servicios domésticos) o ninguna. Nunca se asume
+// automáticamente a partir de la categoría: cada línea se elige manualmente.
+enum DeductionType {
+  NONE
+  ROT
+  RUT
 }
 
 enum MeasurementSource {
@@ -511,9 +526,9 @@ model QuoteItem {
   // Uso exclusivamente interno: nunca se expone en el PDF del cliente.
   companyCost Decimal? @db.Decimal(12, 2)
 
-  // ROT-berättigad: si la mano de obra de esta línea es elegible para la deducción
-  // ROT. Los materiales y otros costes nunca entran en la base del ROT.
-  rotEligible Boolean @default(true)
+  // Skattereduktion (ROT/RUT/ninguna) elegida para la mano de obra de esta línea.
+  // Los materiales y otros costes nunca entran en la base de ninguna deducción.
+  deductionType DeductionType @default(ROT)
 
   // Calculador de habitaciones: de dónde se obtiene la cantidad (sección "reutilizar mediciones")
   measurementSource     MeasurementSource @default(NONE)

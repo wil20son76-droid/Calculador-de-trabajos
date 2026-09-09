@@ -100,18 +100,18 @@ export function calcItem(item: CalcItemInput): CalcItemResult {
     materialsCost,
     laborCostInternal,
     costInternal,
-    rotEligible: item.rotEligible,
+    deductionType: item.deductionType,
     materials,
   };
 }
 
 /**
  * Calcula el presupuesto completo: mano de obra, materiales, otros costes,
- * descuentos (de línea y globales), moms/IVA y ROT-avdrag.
+ * descuentos (de línea y globales), moms/IVA y ROT/RUT-avdrag.
  *
- * Ninguna regla fiscal está codificada de forma fija: vatRatePercent, rotPercent
- * y rotMaxDeduction siempre llegan como parámetros configurables desde la empresa
- * o desde el propio presupuesto (snapshot al crearlo).
+ * Ninguna regla fiscal está codificada de forma fija: vatRatePercent, rotPercent,
+ * rutPercent y rotMaxDeduction siempre llegan como parámetros configurables desde
+ * la empresa o desde el propio presupuesto (snapshot al crearlo).
  */
 export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
   const items = input.items.map(calcItem);
@@ -148,24 +148,33 @@ export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
   const vatAmount = round2(subtotalAfterDiscount * (input.vatRatePercent / 100));
   const totalInclVat = round2(subtotalAfterDiscount + vatAmount);
 
-  // Base ROT: solo la mano de obra de los items marcados como ROT-berättigad.
-  // Los materiales y otros costes nunca entran aquí. Se aplica la misma tasa de
-  // descuento global que al resto de la mano de obra, para mantener la coherencia
-  // con laborAfterDiscount sin necesitar prorrateo por item.
+  // Bases ROT y RUT: cada línea elige su propia Skattereduktion (o ninguna), así
+  // que las dos bases se calculan por separado a partir de la mano de obra de los
+  // items marcados con cada tipo. Los materiales y otros costes nunca entran aquí.
+  // Se aplica la misma tasa de descuento global que al resto de la mano de obra,
+  // para mantener la coherencia con laborAfterDiscount sin necesitar prorrateo por item.
   const rotEligibleLaborSubtotal = round2(
-    items.filter((i) => i.rotEligible).reduce((sum, i) => sum + i.laborNet, 0)
+    items.filter((i) => i.deductionType === "ROT").reduce((sum, i) => sum + i.laborNet, 0)
+  );
+  const rutEligibleLaborSubtotal = round2(
+    items.filter((i) => i.deductionType === "RUT").reduce((sum, i) => sum + i.laborNet, 0)
   );
   const laborDiscountRate = laborSubtotal > 0 ? laborAfterDiscount / laborSubtotal : 1;
   const rotEligibleLaborBase = round2(rotEligibleLaborSubtotal * laborDiscountRate);
+  const rutEligibleLaborBase = round2(rutEligibleLaborSubtotal * laborDiscountRate);
 
   let rotDeduction = 0;
-  if (input.rotEnabled) {
+  if (rotEligibleLaborBase > 0 && input.rotPercent > 0) {
     rotDeduction = round2(rotEligibleLaborBase * (input.rotPercent / 100));
     if (input.rotMaxDeduction != null) {
       rotDeduction = Math.min(rotDeduction, input.rotMaxDeduction);
     }
   }
-  const totalDue = round2(totalInclVat - rotDeduction);
+  let rutDeduction = 0;
+  if (rutEligibleLaborBase > 0 && input.rutPercent > 0) {
+    rutDeduction = round2(rutEligibleLaborBase * (input.rutPercent / 100));
+  }
+  const totalDue = round2(totalInclVat - rotDeduction - rutDeduction);
 
   // Desglose interno: venta / coste mano de obra / coste materiales / otros costes.
   // "Otros costes" se pasan al cliente a coste (sin margen), por lo que su coste
@@ -192,6 +201,8 @@ export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
     totalInclVat,
     rotEligibleLaborBase,
     rotDeduction,
+    rutEligibleLaborBase,
+    rutDeduction,
     totalDue,
     laborCostInternal,
     materialCostInternal,

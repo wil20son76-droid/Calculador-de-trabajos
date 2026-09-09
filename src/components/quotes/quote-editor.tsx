@@ -18,6 +18,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/field";
 import { calcQuote } from "@/lib/calc/engine";
 import { draftToCalcInput } from "@/lib/calc/from-draft";
+import { groupLinesByCategory } from "@/lib/calc/category-summary";
 import { generateFortnoxText } from "@/lib/quotes/fortnox-text";
 import { type QuoteUpdateInput, DISCOUNT_TYPES } from "@/lib/validation/quote";
 import type { ItemDraft, QuoteDraft } from "@/lib/quotes/draft-types";
@@ -71,8 +72,8 @@ export function QuoteEditor({
         quoteDate: new Date(data.quoteDate),
         currency: data.currency,
         vatRatePercent: data.vatRatePercent,
-        rotEnabled: data.rotEnabled,
         rotPercent: data.rotPercent,
+        rutPercent: data.rutPercent,
         discountType: data.discountType,
         discountValue: data.discountValue,
         materialMarginDefaultPercent: data.materialMarginDefaultPercent,
@@ -188,6 +189,18 @@ export function QuoteEditor({
     if (res.ok) router.push("/presupuestos");
   }
 
+  const categoryGroups = groupLinesByCategory(
+    draft.items.map((item, i) => ({
+      id: item.id,
+      name: item.name || "Trabajo",
+      categoryName: item.categoryName || "",
+      quantity: item.quantity,
+      unit: item.unit,
+      unitPrice: item.unitPrice,
+      lineTotal: result.items[i]?.lineTotal ?? 0,
+    }))
+  );
+
   const totalHours = draft.items.reduce(
     (sum, item) =>
       sum + (item.useDetailedLabor ? (item.workerCount || 0) * (item.hoursPerWorker || 0) : 0),
@@ -198,10 +211,10 @@ export function QuoteEditor({
   const fortnoxText = generateFortnoxText({
     projectName: draft.projectName,
     currency: draft.currency,
-    rotEnabled: draft.rotEnabled,
     result,
     items: draft.items.map((item) => ({
       name: item.name || "Trabajo",
+      categoryName: item.categoryName || "",
       quantity: item.quantity,
       unit: item.unit.toLowerCase(),
       showQuantity: AREA_METHODS.has(item.pricingMethod) || item.pricingMethod === "PER_UNIT",
@@ -368,10 +381,10 @@ export function QuoteEditor({
             </div>
           </Card>
 
-          {/* Moms, ROT y descuento */}
+          {/* Moms, ROT/RUT y descuento */}
           <Card>
-            <h2 className="mb-3 text-sm font-semibold text-slate-900">Moms, ROT y descuento</h2>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <h2 className="mb-3 text-sm font-semibold text-slate-900">Moms, ROT/RUT y descuento</h2>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <Field label="Moms / IVA %">
                 <Input
                   type="number"
@@ -402,23 +415,13 @@ export function QuoteEditor({
                   onChange={(e) => update("discountValue", Number(e.target.value))}
                 />
               </Field>
-              <Field label="ROT-avdrag">
-                <label className="flex h-[38px] items-center gap-2 rounded-lg border border-slate-300 px-3 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={draft.rotEnabled}
-                    onChange={(e) => update("rotEnabled", e.target.checked)}
-                  />
-                  {draft.rotEnabled ? "Activado" : "Desactivado"} ({draft.rotPercent}%)
-                </label>
-              </Field>
             </div>
-            {draft.rotEnabled && (
-              <p className="mt-2 text-xs text-slate-400">
-                Se aplica solo sobre los trabajos marcados como &ldquo;ROT-berättigad&rdquo; (ver
-                cada línea de trabajo). Materiales y otros costes nunca entran en la base del ROT.
-              </p>
-            )}
+            <p className="mt-3 text-xs text-slate-400">
+              ROT {draft.rotPercent}% y RUT {draft.rutPercent}% (configurables en Configuración) se
+              aplican solo sobre los trabajos marcados como &ldquo;ROT&rdquo; o &ldquo;RUT&rdquo;
+              respectivamente en su Skattereduktion (ver cada línea de trabajo). Materiales y otros
+              costes nunca entran en ninguna base de deducción.
+            </p>
           </Card>
 
           <FortnoxCopyPanel swedish={fortnoxText.swedish} spanish={fortnoxText.spanish} />
@@ -428,7 +431,7 @@ export function QuoteEditor({
         <div className="lg:sticky lg:top-6 lg:self-start">
           <QuoteSummary
             result={result}
-            rotEnabled={draft.rotEnabled}
+            categoryGroups={categoryGroups}
             currency={draft.currency}
             totalHours={totalHours}
             effectiveHourlyRate={effectiveHourlyRate}

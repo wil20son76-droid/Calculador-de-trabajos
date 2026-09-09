@@ -116,7 +116,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
               discountType: item.discountType,
               discountValue: item.discountValue,
               companyCost: item.companyCost,
-              rotEligible: item.rotEligible,
+              deductionType: item.deductionType,
               measurementSource: item.measurementSource,
               subtractOpeningWidths: item.subtractOpeningWidths,
               sortOrder: index,

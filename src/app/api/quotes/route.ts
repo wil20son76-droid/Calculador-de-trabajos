@@ -5,6 +5,8 @@ import { prisma } from "@/lib/db/prisma";
 import { getCompanyId } from "@/lib/auth/session";
 import { handleApiError } from "@/lib/api/handle-error";
 import { generateQuoteNumber } from "@/lib/quotes/service";
+import { PRICING_METHODS, WORK_UNITS } from "@/lib/validation/price-list";
+import { DEDUCTION_TYPES } from "@/lib/validation/quote";
 
 export async function GET(req: NextRequest) {
   try {
@@ -33,12 +35,24 @@ export async function GET(req: NextRequest) {
   }
 }
 
+// Un trabajo elegido en la multiselección de "Nuevo cálculo" (varias categorías,
+// varios trabajos por categoría). Cada uno se convierte en una línea independiente.
+const jobSelectionSchema = z.object({
+  priceListItemId: z.string().optional().nullable(),
+  categoryName: z.string().optional().nullable(),
+  name: z.string().min(1),
+  pricingMethod: z.enum(PRICING_METHODS),
+  unit: z.enum(WORK_UNITS),
+  defaultUnitPrice: z.coerce.number().min(0).default(0),
+  deductionType: z.enum(DEDUCTION_TYPES).default("ROT"),
+});
+
 const createQuoteSchema = z.object({
   projectName: z.string().min(1, "El nombre del trabajo es obligatorio"),
   siteAddress: z.string().optional().nullable(),
   notesInternal: z.string().optional().nullable(),
   quoteDate: z.string().optional().nullable(),
-  categoryName: z.string().optional().nullable(),
+  jobs: z.array(jobSelectionSchema).default([]),
 });
 
 export async function POST(req: NextRequest) {
@@ -61,29 +75,24 @@ export async function POST(req: NextRequest) {
         quoteDate: body.quoteDate ? new Date(body.quoteDate) : new Date(),
         currency: company.currency,
         vatRatePercent: company.vatRatePercent,
-        rotEnabled: company.rotEnabledDefault,
         rotPercent: company.rotPercent,
+        rutPercent: company.rutPercent,
         materialMarginDefaultPercent: company.defaultMaterialMarginPercent,
-        ...(body.categoryName
-          ? {
-              items: {
-                create: [
-                  {
-                    categoryName: body.categoryName,
-                    name: body.categoryName,
-                    pricingMethod: "PER_M2",
-                    unit: "M2",
-                    quantity: 0,
-                    unitPrice: 0,
-                    internalHourlyRate: company.defaultInternalHourlyRate,
-                    hourlyRate: company.defaultHourlyRate,
-                    rotEligible: true,
-                    sortOrder: 0,
-                  },
-                ],
-              },
-            }
-          : {}),
+        items: {
+          create: body.jobs.map((job, index) => ({
+            priceListItemId: job.priceListItemId || null,
+            categoryName: job.categoryName || null,
+            name: job.name,
+            pricingMethod: job.pricingMethod,
+            unit: job.unit,
+            quantity: 1,
+            unitPrice: job.defaultUnitPrice,
+            internalHourlyRate: company.defaultInternalHourlyRate,
+            hourlyRate: company.defaultHourlyRate,
+            deductionType: job.deductionType,
+            sortOrder: index,
+          })),
+        },
       },
     });
 

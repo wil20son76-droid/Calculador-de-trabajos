@@ -21,6 +21,7 @@ export default async function SettingsPage() {
           vatRatePercent: Number(company.vatRatePercent),
           rotEnabledDefault: company.rotEnabledDefault,
           rotPercent: Number(company.rotPercent),
+          rutPercent: Number(company.rutPercent),
           rotMaxDeductionPerQuote:
             company.rotMaxDeductionPerQuote != null ? Number(company.rotMaxDeductionPerQuote) : null,
           defaultHourlyRate: Number(company.defaultHourlyRate),

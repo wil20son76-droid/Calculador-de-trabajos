@@ -6,6 +6,7 @@ import type {
   MeasurementSource,
   MaterialCalcType,
   OpeningType,
+  DeductionType,
 } from "@prisma/client";
 
 export interface MaterialDraft {
@@ -45,8 +46,8 @@ export interface ItemDraft {
   discountType: DiscountType;
   discountValue: number;
   companyCost?: number | null;
-  /** ROT-berättigad: si la mano de obra de este trabajo es elegible para el ROT-avdrag. */
-  rotEligible: boolean;
+  /** Skattereduktion de este trabajo: ROT, RUT o ninguna (NONE). */
+  deductionType: DeductionType;
   measurementSource: MeasurementSource;
   subtractOpeningWidths: boolean;
   roomIds: string[];
@@ -84,8 +85,8 @@ export interface QuoteDraft {
   quoteDate: string;
   currency: string;
   vatRatePercent: number;
-  rotEnabled: boolean;
   rotPercent: number;
+  rutPercent: number;
   discountType: DiscountType;
   discountValue: number;
   materialMarginDefaultPercent: number;
@@ -124,7 +125,7 @@ export function emptyItem(): ItemDraft {
     useDetailedLabor: false,
     discountType: "NONE",
     discountValue: 0,
-    rotEligible: true,
+    deductionType: "ROT",
     measurementSource: "NONE",
     subtractOpeningWidths: false,
     roomIds: [],

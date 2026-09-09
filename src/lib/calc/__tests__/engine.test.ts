@@ -10,10 +10,21 @@ import {
   suggestContainers,
   applyWaste,
 } from "../materials-auto";
+import { groupLinesByCategory } from "../category-summary";
+import type { CalcQuoteInput } from "../types";
+
+const baseQuote: Pick<CalcQuoteInput, "discountType" | "discountValue" | "vatRatePercent" | "rotPercent" | "rutPercent"> = {
+  discountType: "NONE",
+  discountValue: 0,
+  vatRatePercent: 25,
+  rotPercent: 30,
+  rutPercent: 50,
+};
 
 describe("calcQuote — resumen (sección 9 de la spec)", () => {
-  it("mano de obra 45000 + materiales 22000 + otros 3000 => subtotal 70000, moms 17500, ROT -22500, a pagar 65000", () => {
+  it("mano de obra 45000 + materiales 22000 + otros 3000 => subtotal 70000, moms 17500, ROT -13500 (30%), a pagar 74000", () => {
     const result = calcQuote({
+      ...baseQuote,
       items: [
         {
           id: "1",
@@ -22,23 +33,18 @@ describe("calcQuote — resumen (sección 9 de la spec)", () => {
           unitPrice: 45000,
           discountType: "NONE",
           discountValue: 0,
-          rotEligible: true,
+          deductionType: "ROT",
           materials: [{ id: "m1", quantity: 1, purchasePrice: 22000, marginPercent: 0 }],
         },
       ],
       otherCosts: [{ id: "o1", quantity: 1, unitPrice: 3000 }],
-      discountType: "NONE",
-      discountValue: 0,
-      vatRatePercent: 25,
-      rotEnabled: true,
-      rotPercent: 50,
     });
 
     expect(result.subtotalAfterDiscount).toBe(70000);
     expect(result.vatAmount).toBe(17500);
     expect(result.totalInclVat).toBe(87500);
-    expect(result.rotDeduction).toBe(22500);
-    expect(result.totalDue).toBe(65000);
+    expect(result.rotDeduction).toBe(13500); // 45000 × 30%
+    expect(result.totalDue).toBe(74000);
   });
 });
 
@@ -55,7 +61,7 @@ describe("calcItem — coste interno por horas (sección 12: precio cliente vs c
       unitPrice: 0,
       discountType: "NONE",
       discountValue: 0,
-      rotEligible: true,
+      deductionType: "ROT",
       materials: [],
     });
 
@@ -66,6 +72,7 @@ describe("calcItem — coste interno por horas (sección 12: precio cliente vs c
 
   it("separa el coste interno de mano de obra y de materiales en el resumen del presupuesto", () => {
     const result = calcQuote({
+      ...baseQuote,
       items: [
         {
           id: "1",
@@ -78,16 +85,11 @@ describe("calcItem — coste interno por horas (sección 12: precio cliente vs c
           unitPrice: 0,
           discountType: "NONE",
           discountValue: 0,
-          rotEligible: true,
+          deductionType: "NONE",
           materials: [{ id: "m1", quantity: 10, purchasePrice: 100, marginPercent: 20 }],
         },
       ],
       otherCosts: [],
-      discountType: "NONE",
-      discountValue: 0,
-      vatRatePercent: 25,
-      rotEnabled: false,
-      rotPercent: 50,
     });
 
     expect(result.laborCostInternal).toBe(16800);
@@ -125,6 +127,7 @@ describe("Integración: habitación -> línea de trabajo -> materiales -> presup
     const wallArea = getMeasurementValue("NET_WALL", aggregated);
 
     const result = calcQuote({
+      ...baseQuote,
       items: [
         {
           id: "paredes",
@@ -133,16 +136,11 @@ describe("Integración: habitación -> línea de trabajo -> materiales -> presup
           unitPrice: 150,
           discountType: "NONE",
           discountValue: 0,
-          rotEligible: true,
+          deductionType: "NONE",
           materials: [],
         },
       ],
       otherCosts: [],
-      discountType: "NONE",
-      discountValue: 0,
-      vatRatePercent: 25,
-      rotEnabled: false,
-      rotPercent: 50,
     });
 
     // 51,01 m² × 150 SEK/m² = 7.651,50 SEK (ejemplo de la sección "Pintura por m² de pared")
@@ -156,6 +154,26 @@ describe("Integración: habitación -> línea de trabajo -> materiales -> presup
 
     const expectedFloor = 6 * 5 + 4 * 3.5;
     expect(getMeasurementValue("FLOOR", aggregated)).toBeCloseTo(expectedFloor, 3);
+  });
+
+  it("habitaciones distintas por trabajo: cada línea usa solo las suyas, no todas las del proyecto", () => {
+    const dormitorio = computeRoomMeasurements(
+      { length: 4, width: 3, height: 2.5 },
+      [{ type: "DOOR", width: 0.9, height: 2.1, quantity: 1 }]
+    );
+    const salon = computeRoomMeasurements(
+      { length: 6, width: 5, height: 2.5 },
+      [{ type: "DOOR", width: 0.9, height: 2.1, quantity: 1 }]
+    );
+
+    // "Pintura paredes" solo usa el dormitorio.
+    const paredesArea = getMeasurementValue("NET_WALL", aggregateRoomMeasurements([dormitorio]));
+    // "Lijado parquet" y "Barnizado" solo usan el salón.
+    const salonFloor = getMeasurementValue("FLOOR", aggregateRoomMeasurements([salon]));
+
+    expect(paredesArea).toBeCloseTo(getMeasurementValue("NET_WALL", aggregateRoomMeasurements([dormitorio])), 6);
+    expect(salonFloor).toBe(30); // 6×5
+    expect(paredesArea).not.toBeCloseTo(salonFloor, 0);
   });
 });
 
@@ -259,101 +277,369 @@ describe("Rodapiés: perímetro menos ancho de puertas y desperdicio (sección 1
   });
 });
 
-describe("ROT-avdrag por trabajo (sección ROT de la spec)", () => {
+describe("Resumen agrupado por categoría (sección 7 de la spec)", () => {
+  it("una sola categoría: un único grupo con todas las líneas", () => {
+    const groups = groupLinesByCategory([
+      { id: "1", name: "Pintura de paredes", categoryName: "Pintura interior", quantity: 42, unit: "M2", unitPrice: 150, lineTotal: 6300 },
+      { id: "2", name: "Pintura de techo", categoryName: "Pintura interior", quantity: 42, unit: "M2", unitPrice: 180, lineTotal: 7560 },
+    ]);
+    expect(groups).toHaveLength(1);
+    expect(groups[0].categoryName).toBe("Pintura interior");
+    expect(groups[0].subtotal).toBe(13860);
+  });
+
+  it("dos categorías: dos grupos con su propio subtotal", () => {
+    const groups = groupLinesByCategory([
+      { id: "1", name: "Pintura de paredes", categoryName: "Pintura interior", quantity: 42, unit: "M2", unitPrice: 150, lineTotal: 6300 },
+      { id: "2", name: "Lijado parquet", categoryName: "Suelos", quantity: 30, unit: "M2", unitPrice: 250, lineTotal: 7500 },
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.categoryName)).toEqual(["Pintura interior", "Suelos"]);
+    expect(groups[0].subtotal).toBe(6300);
+    expect(groups[1].subtotal).toBe(7500);
+  });
+
+  it("tres o más categorías: cada una con su subtotal, y el total general es la suma de todos", () => {
+    const lines = [
+      { id: "1", name: "Pintura de paredes", categoryName: "Pintura interior", quantity: 42, unit: "M2", unitPrice: 150, lineTotal: 6300 },
+      { id: "2", name: "Lijado parquet", categoryName: "Suelos", quantity: 30, unit: "M2", unitPrice: 250, lineTotal: 7500 },
+      { id: "3", name: "Barnizado", categoryName: "Suelos", quantity: 30, unit: "M2", unitPrice: 120, lineTotal: 3600 },
+      { id: "4", name: "Montaje cocina", categoryName: "Cocina", quantity: 20, unit: "HOUR", unitPrice: 650, lineTotal: 13000 },
+    ];
+    const groups = groupLinesByCategory(lines);
+    expect(groups).toHaveLength(3);
+    expect(groups.map((g) => g.categoryName)).toEqual(["Pintura interior", "Suelos", "Cocina"]);
+    expect(groups[1].subtotal).toBe(11100); // Suelos: 7500 + 3600
+    const grandTotal = groups.reduce((sum, g) => sum + g.subtotal, 0);
+    expect(grandTotal).toBe(lines.reduce((sum, l) => sum + l.lineTotal, 0));
+  });
+
+  it("líneas sin categoría se agrupan aparte, sin romper el resto de grupos", () => {
+    const groups = groupLinesByCategory([
+      { id: "1", name: "Trabajo personalizado", categoryName: "", quantity: 1, unit: "UNIT", unitPrice: 500, lineTotal: 500 },
+      { id: "2", name: "Pintura de paredes", categoryName: "Pintura interior", quantity: 10, unit: "M2", unitPrice: 150, lineTotal: 1500 },
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups[0].categoryName).toBe("Otros trabajos");
+    expect(groups[1].categoryName).toBe("Pintura interior");
+  });
+});
+
+describe("Trabajos de distintas categorías en el mismo cálculo (sección 1-4 de la spec)", () => {
   const baseItem = {
     useDetailedLabor: false as const,
     discountType: "NONE" as const,
     discountValue: 0,
-    materials: [],
+    deductionType: "ROT" as const,
+    materials: [] as never[],
   };
 
-  it("ROT desactivado: no hay deducción aunque haya items elegibles", () => {
+  it("un cálculo puede combinar pintura, suelos y cocina a la vez, cada uno con su importe", () => {
     const result = calcQuote({
-      items: [{ ...baseItem, id: "1", quantity: 1, unitPrice: 10000, rotEligible: true }],
+      ...baseQuote,
+      items: [
+        { ...baseItem, id: "paredes", quantity: 42, unitPrice: 150 }, // Pintura interior: 6300
+        { ...baseItem, id: "lijado", quantity: 30, unitPrice: 250 }, // Suelos: 7500
+        { ...baseItem, id: "barnizado", quantity: 30, unitPrice: 120 }, // Suelos: 3600
+        { ...baseItem, id: "cocina", quantity: 20, unitPrice: 650 }, // Cocina: 13000
+      ],
       otherCosts: [],
-      discountType: "NONE",
-      discountValue: 0,
-      vatRatePercent: 25,
-      rotEnabled: false,
-      rotPercent: 50,
+    });
+
+    expect(result.items).toHaveLength(4);
+    expect(result.laborSubtotal).toBe(6300 + 7500 + 3600 + 13000);
+    // No hace falta crear varios cálculos: todas las líneas conviven en el mismo resultado.
+    expect(result.items.map((i) => i.lineTotal)).toEqual([6300, 7500, 3600, 13000]);
+  });
+});
+
+describe("ROT/RUT-avdrag por trabajo (Skattereduktion: sección 8-13 de la spec)", () => {
+  const baseItem = {
+    useDetailedLabor: false as const,
+    discountType: "NONE" as const,
+    discountValue: 0,
+    materials: [] as never[],
+  };
+
+  it("NONE: sin deducción aunque el % de ROT/RUT esté configurado", () => {
+    const result = calcQuote({
+      ...baseQuote,
+      items: [{ ...baseItem, id: "1", quantity: 1, unitPrice: 10000, deductionType: "NONE" }],
+      otherCosts: [],
     });
     expect(result.rotDeduction).toBe(0);
+    expect(result.rutDeduction).toBe(0);
     expect(result.totalDue).toBe(result.totalInclVat);
   });
 
-  it("solo la mano de obra de los items marcados como ROT-berättigad entra en la base del ROT", () => {
+  it("ROT 30%: se calcula solo sobre la mano de obra elegible marcada como ROT", () => {
     const result = calcQuote({
+      ...baseQuote,
       items: [
-        { ...baseItem, id: "elegible", quantity: 1, unitPrice: 10000, rotEligible: true },
-        { ...baseItem, id: "no-elegible", quantity: 1, unitPrice: 5000, rotEligible: false },
+        { ...baseItem, id: "elegible", quantity: 1, unitPrice: 40000, deductionType: "ROT" },
+        { ...baseItem, id: "no-elegible", quantity: 1, unitPrice: 5000, deductionType: "NONE" },
       ],
       otherCosts: [],
-      discountType: "NONE",
-      discountValue: 0,
-      vatRatePercent: 25,
-      rotEnabled: true,
-      rotPercent: 50,
     });
-    // Solo 10000 (el item elegible) entra en la base del ROT, no los 15000 totales.
-    expect(result.rotEligibleLaborBase).toBe(10000);
-    expect(result.rotDeduction).toBe(5000);
+    // Ejemplo de la spec: mano de obra ROT 40.000 SEK, ROT 30% => 12.000 SEK.
+    expect(result.rotEligibleLaborBase).toBe(40000);
+    expect(result.rotDeduction).toBe(12000);
+    expect(result.rutDeduction).toBe(0);
   });
 
-  it("los materiales nunca entran en la base del ROT, aunque el item sea elegible", () => {
+  it("RUT 50%: se calcula solo sobre la mano de obra elegible marcada como RUT", () => {
     const result = calcQuote({
+      ...baseQuote,
+      items: [{ ...baseItem, id: "1", quantity: 1, unitPrice: 10000, deductionType: "RUT" }],
+      otherCosts: [],
+    });
+    // Ejemplo de la spec: mano de obra RUT 10.000 SEK, RUT 50% => 5.000 SEK.
+    expect(result.rutEligibleLaborBase).toBe(10000);
+    expect(result.rutDeduction).toBe(5000);
+    expect(result.rotDeduction).toBe(0);
+  });
+
+  it("ROT + RUT en el mismo cálculo: bases separadas, sin mezclarse entre sí ni con el trabajo sin deducción", () => {
+    const result = calcQuote({
+      ...baseQuote,
+      items: [
+        { ...baseItem, id: "rot-a", quantity: 1, unitPrice: 20000, deductionType: "ROT" },
+        { ...baseItem, id: "rot-b", quantity: 1, unitPrice: 10000, deductionType: "ROT" },
+        { ...baseItem, id: "rut-c", quantity: 1, unitPrice: 8000, deductionType: "RUT" },
+        {
+          ...baseItem,
+          id: "sin-deduccion",
+          quantity: 1,
+          unitPrice: 5000,
+          deductionType: "NONE",
+          materials: [{ id: "m1", quantity: 1, purchasePrice: 12000, marginPercent: 0 }],
+        },
+      ],
+      otherCosts: [{ id: "o1", quantity: 1, unitPrice: 2000 }],
+    });
+
+    // Ejemplo de la spec: ROT 30.000 → -9.000; RUT 8.000 → -4.000; resto intacto.
+    expect(result.rotEligibleLaborBase).toBe(30000);
+    expect(result.rotDeduction).toBe(9000);
+    expect(result.rutEligibleLaborBase).toBe(8000);
+    expect(result.rutDeduction).toBe(4000);
+    expect(result.materialAfterDiscount).toBe(12000);
+    expect(result.otherAfterDiscount).toBe(2000);
+    expect(result.totalDue).toBe(result.totalInclVat - 9000 - 4000);
+  });
+
+  it("los materiales nunca entran en ninguna base (ni ROT ni RUT), aunque el item tenga deducción", () => {
+    const resultRot = calcQuote({
+      ...baseQuote,
       items: [
         {
           ...baseItem,
           id: "1",
           quantity: 1,
           unitPrice: 10000,
-          rotEligible: true,
+          deductionType: "ROT",
           materials: [{ id: "m1", quantity: 1, purchasePrice: 5000, marginPercent: 0 }],
         },
       ],
       otherCosts: [],
-      discountType: "NONE",
-      discountValue: 0,
-      vatRatePercent: 25,
-      rotEnabled: true,
-      rotPercent: 50,
     });
-    // La base ROT es solo la mano de obra (10000), no 10000+5000 de materiales.
-    expect(result.rotEligibleLaborBase).toBe(10000);
-    expect(result.rotDeduction).toBe(5000);
+    expect(resultRot.rotEligibleLaborBase).toBe(10000);
+    expect(resultRot.rotDeduction).toBe(3000);
+
+    const resultRut = calcQuote({
+      ...baseQuote,
+      items: [
+        {
+          ...baseItem,
+          id: "1",
+          quantity: 1,
+          unitPrice: 10000,
+          deductionType: "RUT",
+          materials: [{ id: "m1", quantity: 1, purchasePrice: 5000, marginPercent: 0 }],
+        },
+      ],
+      otherCosts: [],
+    });
+    expect(resultRut.rutEligibleLaborBase).toBe(10000);
+    expect(resultRut.rutDeduction).toBe(5000);
   });
 
-  it("otros costes nunca entran en la base del ROT", () => {
+  it("otros costes nunca entran en la base de ROT ni de RUT", () => {
     const result = calcQuote({
-      items: [{ ...baseItem, id: "1", quantity: 1, unitPrice: 10000, rotEligible: true }],
+      ...baseQuote,
+      items: [
+        { ...baseItem, id: "rot", quantity: 1, unitPrice: 10000, deductionType: "ROT" },
+        { ...baseItem, id: "rut", quantity: 1, unitPrice: 8000, deductionType: "RUT" },
+      ],
       otherCosts: [{ id: "o1", quantity: 1, unitPrice: 3000 }],
-      discountType: "NONE",
-      discountValue: 0,
-      vatRatePercent: 25,
-      rotEnabled: true,
-      rotPercent: 50,
     });
     expect(result.rotEligibleLaborBase).toBe(10000);
-    expect(result.rotDeduction).toBe(5000);
+    expect(result.rutEligibleLaborBase).toBe(8000);
   });
 
   it("snapshot del % de ROT: cada cálculo usa el porcentaje que se le pasa, no un valor global fijo", () => {
-    const input = {
-      items: [{ ...baseItem, id: "1", quantity: 1, unitPrice: 10000, rotEligible: true }],
-      otherCosts: [],
-      discountType: "NONE" as const,
-      discountValue: 0,
-      vatRatePercent: 25,
-      rotEnabled: true,
-    };
+    const items: CalcQuoteInput["items"] = [
+      { ...baseItem, id: "1", quantity: 1, unitPrice: 10000, deductionType: "ROT" },
+    ];
 
     // Un cálculo antiguo, guardado con el 30% vigente en ese momento...
-    const oldCalculation = calcQuote({ ...input, rotPercent: 30 });
+    const oldCalculation = calcQuote({ ...baseQuote, items, otherCosts: [], rotPercent: 30 });
     // ...no cambia aunque la configuración global de la empresa suba después al 50%.
-    const newCalculation = calcQuote({ ...input, rotPercent: 50 });
+    const newCalculation = calcQuote({ ...baseQuote, items, otherCosts: [], rotPercent: 50 });
 
     expect(oldCalculation.rotDeduction).toBe(3000);
     expect(newCalculation.rotDeduction).toBe(5000);
     expect(oldCalculation.rotDeduction).not.toBe(newCalculation.rotDeduction);
+  });
+
+  it("snapshot del % de RUT: cada cálculo usa el porcentaje que se le pasa, no un valor global fijo", () => {
+    const items: CalcQuoteInput["items"] = [
+      { ...baseItem, id: "1", quantity: 1, unitPrice: 10000, deductionType: "RUT" },
+    ];
+
+    // Un cálculo antiguo, guardado con el 40% vigente en ese momento...
+    const oldCalculation = calcQuote({ ...baseQuote, items, otherCosts: [], rutPercent: 40 });
+    // ...no cambia aunque la configuración global de la empresa baje/suba después al 50%.
+    const newCalculation = calcQuote({ ...baseQuote, items, otherCosts: [], rutPercent: 50 });
+
+    expect(oldCalculation.rutDeduction).toBe(4000);
+    expect(newCalculation.rutDeduction).toBe(5000);
+    expect(oldCalculation.rutDeduction).not.toBe(newCalculation.rutDeduction);
+  });
+
+  it("cambio manual ROT → RUT en la misma línea: la base y la deducción se mueven de una a otra", () => {
+    const rotItem = { ...baseItem, id: "1", quantity: 1, unitPrice: 10000, deductionType: "ROT" as const };
+    const rutItem = { ...rotItem, deductionType: "RUT" as const };
+
+    const resultRot = calcQuote({ ...baseQuote, items: [rotItem], otherCosts: [] });
+    expect(resultRot.rotDeduction).toBe(3000); // 10000 × 30%
+    expect(resultRot.rutDeduction).toBe(0);
+
+    const resultRut = calcQuote({ ...baseQuote, items: [rutItem], otherCosts: [] });
+    expect(resultRut.rotDeduction).toBe(0);
+    expect(resultRut.rutDeduction).toBe(5000); // 10000 × 50%
+  });
+
+  it("cambio manual RUT → NONE en la misma línea: la deducción desaparece por completo", () => {
+    const rutItem = { ...baseItem, id: "1", quantity: 1, unitPrice: 10000, deductionType: "RUT" as const };
+    const noneItem = { ...rutItem, deductionType: "NONE" as const };
+
+    const resultRut = calcQuote({ ...baseQuote, items: [rutItem], otherCosts: [] });
+    expect(resultRut.rutDeduction).toBe(5000);
+
+    const resultNone = calcQuote({ ...baseQuote, items: [noneItem], otherCosts: [] });
+    expect(resultNone.rutDeduction).toBe(0);
+    expect(resultNone.rotDeduction).toBe(0);
+    expect(resultNone.totalDue).toBe(resultNone.totalInclVat);
+  });
+
+  it("la categoría del trabajo nunca fuerza el tipo de deducción: cada línea decide la suya", () => {
+    // Dos líneas de la misma categoría ("Suelos"), una ROT y otra RUT: el motor
+    // no asume nada a partir de la categoría, solo mira deductionType por línea.
+    const result = calcQuote({
+      ...baseQuote,
+      items: [
+        { ...baseItem, id: "lijado", quantity: 1, unitPrice: 10000, deductionType: "ROT" },
+        { ...baseItem, id: "barnizado", quantity: 1, unitPrice: 6000, deductionType: "RUT" },
+      ],
+      otherCosts: [],
+    });
+    expect(result.rotEligibleLaborBase).toBe(10000);
+    expect(result.rutEligibleLaborBase).toBe(6000);
+  });
+});
+
+describe("Caso de prueba end-to-end (sección 21 de la spec): Dormitorio + Salón", () => {
+  it("pintura de paredes usa solo el dormitorio; lijado y barnizado usan solo el salón; los tres en el mismo cálculo", () => {
+    const dormitorio = computeRoomMeasurements(
+      { length: 4, width: 3, height: 2.5 },
+      [{ type: "DOOR", width: 0.9, height: 2.1, quantity: 1 }]
+    );
+    const salon = computeRoomMeasurements({ length: 6, width: 5, height: 2.5 }, []);
+
+    const paredesArea = getMeasurementValue("NET_WALL", aggregateRoomMeasurements([dormitorio]));
+    const salonFloor = getMeasurementValue("FLOOR", aggregateRoomMeasurements([salon]));
+    expect(salonFloor).toBe(30);
+
+    const result = calcQuote({
+      ...baseQuote,
+      items: [
+        {
+          id: "pintura-paredes",
+          useDetailedLabor: false,
+          quantity: paredesArea,
+          unitPrice: 150,
+          discountType: "NONE",
+          discountValue: 0,
+          deductionType: "ROT",
+          materials: [],
+        },
+        {
+          id: "lijado-parquet",
+          useDetailedLabor: false,
+          quantity: salonFloor,
+          unitPrice: 250,
+          discountType: "NONE",
+          discountValue: 0,
+          deductionType: "ROT",
+          materials: [],
+        },
+        {
+          id: "barnizado",
+          useDetailedLabor: false,
+          quantity: salonFloor,
+          unitPrice: 120,
+          discountType: "NONE",
+          discountValue: 0,
+          deductionType: "ROT",
+          materials: [],
+        },
+      ],
+      otherCosts: [],
+    });
+
+    expect(result.items).toHaveLength(3);
+    expect(result.items[1].lineTotal).toBe(30 * 250);
+    expect(result.items[2].lineTotal).toBe(30 * 120);
+
+    // Los tres trabajos son ROT: la base es la suma de las tres manos de obra.
+    const expectedLabor = result.items[0].laborNet + result.items[1].laborNet + result.items[2].laborNet;
+    expect(result.rotEligibleLaborBase).toBeCloseTo(expectedLabor, 2);
+    expect(result.rotDeduction).toBeCloseTo(expectedLabor * 0.3, 2);
+
+    // Ahora se añade un trabajo RUT de prueba y se comprueba que no se mezcla con la base ROT.
+    const withRut = calcQuote({
+      ...baseQuote,
+      items: [
+        ...[
+          { id: "pintura-paredes", quantity: paredesArea, unitPrice: 150 },
+          { id: "lijado-parquet", quantity: salonFloor, unitPrice: 250 },
+          { id: "barnizado", quantity: salonFloor, unitPrice: 120 },
+        ].map((i) => ({
+          ...i,
+          useDetailedLabor: false as const,
+          discountType: "NONE" as const,
+          discountValue: 0,
+          deductionType: "ROT" as const,
+          materials: [] as never[],
+        })),
+        {
+          id: "limpieza-rut",
+          useDetailedLabor: false,
+          quantity: 1,
+          unitPrice: 2000,
+          discountType: "NONE",
+          discountValue: 0,
+          deductionType: "RUT",
+          materials: [],
+        },
+      ],
+      otherCosts: [],
+    });
+
+    expect(withRut.rotEligibleLaborBase).toBeCloseTo(expectedLabor, 2);
+    expect(withRut.rutEligibleLaborBase).toBe(2000);
+    expect(withRut.rutDeduction).toBe(1000); // 2000 × 50%
+    expect(withRut.rotDeduction).toBeCloseTo(expectedLabor * 0.3, 2);
   });
 });

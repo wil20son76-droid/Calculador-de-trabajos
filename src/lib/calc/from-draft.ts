@@ -6,8 +6,8 @@ export function draftToCalcInput(draft: QuoteDraft): CalcQuoteInput {
     discountType: draft.discountType,
     discountValue: draft.discountValue,
     vatRatePercent: draft.vatRatePercent,
-    rotEnabled: draft.rotEnabled,
     rotPercent: draft.rotPercent,
+    rutPercent: draft.rutPercent,
     otherCosts: draft.otherCosts.map((c) => ({
       id: c.id,
       quantity: c.quantity,
@@ -25,7 +25,7 @@ export function draftToCalcInput(draft: QuoteDraft): CalcQuoteInput {
       discountType: item.discountType,
       discountValue: item.discountValue,
       companyCost: item.companyCost,
-      rotEligible: item.rotEligible,
+      deductionType: item.deductionType,
       materials: item.materials.map((m) => ({
         id: m.id,
         quantity: m.quantity,

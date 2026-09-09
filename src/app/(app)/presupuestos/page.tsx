@@ -46,8 +46,8 @@ export default async function QuotesPage({ searchParams }: PageProps<"/presupues
       surfaceM2,
       laborTotal: Number(q.cachedLaborTotal),
       materialTotal: Number(q.cachedMaterialTotal),
-      rotEnabled: q.rotEnabled,
       rotDeduction: Number(q.cachedRotDeduction),
+      rutDeduction: Number(q.cachedRutDeduction),
       total: Number(q.cachedTotalDue),
     };
   });

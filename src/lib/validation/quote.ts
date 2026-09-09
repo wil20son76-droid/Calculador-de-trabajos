@@ -23,6 +23,7 @@ export const MEASUREMENT_SOURCES = [
 ] as const;
 export const MATERIAL_CALC_TYPES = ["NONE", "PAINT", "COVERAGE", "PACKAGE"] as const;
 export const OPENING_TYPES = ["DOOR", "WINDOW", "OTHER"] as const;
+export const DEDUCTION_TYPES = ["NONE", "ROT", "RUT"] as const;
 
 export const roomOpeningSchema = z.object({
   id: z.string().optional(),
@@ -84,7 +85,7 @@ export const quoteItemSchema = z.object({
   discountType: z.enum(DISCOUNT_TYPES).default("NONE"),
   discountValue: z.coerce.number().min(0).default(0),
   companyCost: z.coerce.number().min(0).optional().nullable(),
-  rotEligible: z.boolean().default(true),
+  deductionType: z.enum(DEDUCTION_TYPES).default("ROT"),
   measurementSource: z.enum(MEASUREMENT_SOURCES).default("NONE"),
   subtractOpeningWidths: z.boolean().default(false),
   roomIds: z.array(z.string()).default([]),
@@ -113,8 +114,8 @@ export const quoteUpdateSchema = z.object({
   validUntil: z.coerce.date().optional().nullable(),
   currency: z.string().optional(),
   vatRatePercent: z.coerce.number().min(0).optional(),
-  rotEnabled: z.boolean().optional(),
   rotPercent: z.coerce.number().min(0).optional(),
+  rutPercent: z.coerce.number().min(0).optional(),
   discountType: z.enum(DISCOUNT_TYPES).optional(),
   discountValue: z.coerce.number().min(0).optional(),
   materialMarginDefaultPercent: z.coerce.number().min(0).optional(),

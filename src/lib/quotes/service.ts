@@ -31,8 +31,8 @@ export function toCalcInput(quote: QuoteWithRelations): CalcQuoteInput {
     discountType: quote.discountType,
     discountValue: toNumber(quote.discountValue),
     vatRatePercent: toNumber(quote.vatRatePercent),
-    rotEnabled: quote.rotEnabled,
     rotPercent: toNumber(quote.rotPercent),
+    rutPercent: toNumber(quote.rutPercent),
     otherCosts: quote.otherCosts.map((c) => ({
       id: c.id,
       quantity: toNumber(c.quantity),
@@ -50,7 +50,7 @@ export function toCalcInput(quote: QuoteWithRelations): CalcQuoteInput {
       discountType: item.discountType,
       discountValue: toNumber(item.discountValue),
       companyCost: item.companyCost != null ? toNumber(item.companyCost) : null,
-      rotEligible: item.rotEligible,
+      deductionType: item.deductionType,
       materials: item.materials.map((m) => ({
         id: m.id,
         quantity: toNumber(m.quantity),
@@ -80,6 +80,7 @@ export async function recomputeAndCacheQuote(quoteId: string): Promise<CalcQuote
       cachedVatAmount: result.vatAmount,
       cachedTotalInclVat: result.totalInclVat,
       cachedRotDeduction: result.rotDeduction,
+      cachedRutDeduction: result.rutDeduction,
       cachedTotalDue: result.totalDue,
       cachedCostInternal: result.totalCostInternal,
       cachedLaborCostInternal: result.laborCostInternal,

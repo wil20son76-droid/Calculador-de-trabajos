@@ -85,7 +85,7 @@ export function QuoteItemRow({
     discountType: item.discountType,
     discountValue: item.discountValue,
     companyCost: item.companyCost,
-    rotEligible: item.rotEligible,
+    deductionType: item.deductionType,
     materials: item.materials.map((m) => ({
       id: m.id,
       quantity: m.quantity,
@@ -334,14 +334,18 @@ export function QuoteItemRow({
             </label>
             <label
               className="flex items-center gap-2 text-xs font-medium text-slate-600"
-              title="Si la mano de obra de este trabajo es elegible para el ROT-avdrag"
+              title="Skattereduktion: si la mano de obra de este trabajo es elegible para ROT, RUT o ninguna"
             >
-              <input
-                type="checkbox"
-                checked={item.rotEligible}
-                onChange={(e) => update("rotEligible", e.target.checked)}
-              />
-              ROT-berättigad
+              Skattereduktion
+              <Select
+                value={item.deductionType}
+                onChange={(e) => update("deductionType", e.target.value as ItemDraft["deductionType"])}
+                className="w-auto py-1 text-xs"
+              >
+                <option value="ROT">ROT</option>
+                <option value="RUT">RUT</option>
+                <option value="NONE">Ingen</option>
+              </Select>
             </label>
           </div>
 

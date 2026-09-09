@@ -4,6 +4,13 @@
 
 export type DiscountType = "NONE" | "PERCENT" | "FIXED";
 
+/**
+ * Skattereduktion aplicable a la mano de obra de un trabajo: ROT (reparación/
+ * reforma), RUT (servicios domésticos) o ninguna. Nunca se asume automáticamente
+ * a partir de la categoría del trabajo: siempre se elige por línea.
+ */
+export type DeductionType = "NONE" | "ROT" | "RUT";
+
 export interface CalcMaterialInput {
   id: string;
   quantity: number;
@@ -25,8 +32,8 @@ export interface CalcItemInput {
   discountValue: number;
   /** Coste interno adicional de la empresa para esta línea, nunca visible al cliente. */
   companyCost?: number | null;
-  /** ROT-berättigad: si la mano de obra de esta línea es elegible para el ROT-avdrag. */
-  rotEligible: boolean;
+  /** Skattereduktion de esta línea: ROT, RUT o ninguna (NONE). */
+  deductionType: DeductionType;
   materials: CalcMaterialInput[];
 }
 
@@ -42,8 +49,10 @@ export interface CalcQuoteInput {
   discountType: DiscountType;
   discountValue: number;
   vatRatePercent: number;
-  rotEnabled: boolean;
+  /** % ROT-avdrag, snapshot del presupuesto (configurable en Configuración). */
   rotPercent: number;
+  /** % RUT-avdrag, snapshot del presupuesto (configurable en Configuración). */
+  rutPercent: number;
   rotMaxDeduction?: number | null;
 }
 
@@ -73,7 +82,7 @@ export interface CalcItemResult {
   /** Coste interno de mano de obra (horas × precio interno/h), separado del de materiales. */
   laborCostInternal: number;
   costInternal: number;
-  rotEligible: boolean;
+  deductionType: DeductionType;
   materials: CalcMaterialResult[];
 }
 
@@ -94,9 +103,12 @@ export interface CalcQuoteResult {
   vatAmount: number;
   totalInclVat: number;
 
-  /** Base ROT: solo la mano de obra de los items marcados como rotEligible, tras descuentos. */
+  /** Base ROT: solo la mano de obra de los items con deductionType ROT, tras descuentos. */
   rotEligibleLaborBase: number;
   rotDeduction: number;
+  /** Base RUT: solo la mano de obra de los items con deductionType RUT, tras descuentos. */
+  rutEligibleLaborBase: number;
+  rutDeduction: number;
   totalDue: number;
 
   // Solo para uso interno de la empresa — nunca debe mostrarse en el PDF de cliente.
