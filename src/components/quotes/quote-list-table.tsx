@@ -3,10 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Copy, FileText, Trash2 } from "lucide-react";
+import { Copy, FileText, Trash2, Download } from "lucide-react";
 
 import { Card } from "@/components/ui/card";
-import { formatMoney, formatDate, formatNumber } from "@/lib/utils/format";
+import { formatMoney, formatDate, formatDateTime, formatNumber } from "@/lib/utils/format";
 
 interface QuoteRow {
   id: string;
@@ -14,6 +14,7 @@ interface QuoteRow {
   projectName: string | null;
   siteAddress: string | null;
   quoteDate: string;
+  updatedAt: string;
   jobType: string;
   surfaceM2: number;
   laborTotal: number;
@@ -70,6 +71,9 @@ export function QuoteListTable({ quotes }: { quotes: QuoteRow[] }) {
                 {q.quoteNumber} · {formatDate(q.quoteDate)}
               </p>
               {q.siteAddress && <p className="text-xs text-slate-400">{q.siteAddress}</p>}
+              <p className="text-xs text-slate-400">
+                Última modificación: {formatDateTime(q.updatedAt)}
+              </p>
             </div>
             <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
               {q.jobType}
@@ -110,6 +114,15 @@ export function QuoteListTable({ quotes }: { quotes: QuoteRow[] }) {
               >
                 Abrir / Editar
               </Link>
+              <a
+                href={`/api/quotes/${q.id}/pdf?mode=internal`}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Exportar PDF"
+                className="rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              >
+                <Download className="h-4 w-4" />
+              </a>
               <button
                 onClick={() => handleDuplicate(q.id)}
                 disabled={busyId === q.id}

@@ -46,6 +46,8 @@ export interface CalcOtherCostInput {
 export interface CalcQuoteInput {
   items: CalcItemInput[];
   otherCosts: CalcOtherCostInput[];
+  /** Materiales generales del proyecto, no atados a ningún trabajo (sección 10). */
+  generalMaterials: CalcMaterialInput[];
   discountType: DiscountType;
   discountValue: number;
   vatRatePercent: number;
@@ -88,6 +90,8 @@ export interface CalcItemResult {
 
 export interface CalcQuoteResult {
   items: CalcItemResult[];
+  /** Materiales generales del proyecto ya calculados (precio de venta, coste...). */
+  generalMaterials: CalcMaterialResult[];
 
   laborSubtotal: number;
   materialSubtotal: number;

@@ -13,12 +13,16 @@ import {
 import { groupLinesByCategory } from "../category-summary";
 import type { CalcQuoteInput } from "../types";
 
-const baseQuote: Pick<CalcQuoteInput, "discountType" | "discountValue" | "vatRatePercent" | "rotPercent" | "rutPercent"> = {
+const baseQuote: Pick<
+  CalcQuoteInput,
+  "discountType" | "discountValue" | "vatRatePercent" | "rotPercent" | "rutPercent" | "generalMaterials"
+> = {
   discountType: "NONE",
   discountValue: 0,
   vatRatePercent: 25,
   rotPercent: 30,
   rutPercent: 50,
+  generalMaterials: [],
 };
 
 describe("calcQuote — resumen (sección 9 de la spec)", () => {
@@ -641,5 +645,77 @@ describe("Caso de prueba end-to-end (sección 21 de la spec): Dormitorio + Saló
     expect(withRut.rutEligibleLaborBase).toBe(2000);
     expect(withRut.rutDeduction).toBe(1000); // 2000 × 50%
     expect(withRut.rotDeduction).toBeCloseTo(expectedLabor * 0.3, 2);
+  });
+});
+
+describe("Materiales generales del proyecto, no atados a un trabajo (sección 10 de la spec)", () => {
+  it("un material general se suma al subtotal de materiales aunque no exista ningún trabajo", () => {
+    const result = calcQuote({
+      ...baseQuote,
+      items: [],
+      otherCosts: [],
+      generalMaterials: [{ id: "g1", quantity: 10, purchasePrice: 100, marginPercent: 20 }],
+    });
+
+    // 10 × 100 × 1.20 = 1200 SEK de venta.
+    expect(result.generalMaterials).toHaveLength(1);
+    expect(result.generalMaterials[0].total).toBe(1200);
+    expect(result.materialSubtotal).toBe(1200);
+    expect(result.materialCostInternal).toBe(1000); // 10 × 100, sin margen
+  });
+
+  it("los materiales generales se combinan con los de los trabajos en el mismo subtotal de materiales", () => {
+    const result = calcQuote({
+      ...baseQuote,
+      items: [
+        {
+          id: "1",
+          useDetailedLabor: false,
+          quantity: 1,
+          unitPrice: 1000,
+          discountType: "NONE",
+          discountValue: 0,
+          deductionType: "NONE",
+          materials: [{ id: "m1", quantity: 1, purchasePrice: 500, marginPercent: 0 }],
+        },
+      ],
+      otherCosts: [],
+      generalMaterials: [{ id: "g1", quantity: 1, purchasePrice: 300, marginPercent: 0 }],
+    });
+
+    expect(result.materialSubtotal).toBe(800); // 500 (del trabajo) + 300 (general)
+  });
+
+  it("los materiales generales nunca entran en la base de ROT ni de RUT", () => {
+    const result = calcQuote({
+      ...baseQuote,
+      items: [
+        { id: "1", useDetailedLabor: false, quantity: 1, unitPrice: 10000, discountType: "NONE", discountValue: 0, deductionType: "ROT", materials: [] },
+      ],
+      otherCosts: [],
+      generalMaterials: [{ id: "g1", quantity: 1, purchasePrice: 5000, marginPercent: 0 }],
+    });
+
+    expect(result.rotEligibleLaborBase).toBe(10000);
+    expect(result.rotDeduction).toBe(3000); // 10000 × 30%, sin el material general
+  });
+
+  it("cambiar el desperdicio de un material general recalcula su cantidad necesaria sin afectar a los demás", () => {
+    const material = { calcType: "COVERAGE" as const, coveragePerUnit: 1, wastePercent: 5 };
+    const withoutWaste = computeMaterialAutoCalc(material, 50);
+    const withMoreWaste = computeMaterialAutoCalc({ ...material, wastePercent: 20 }, 50);
+
+    expect(withMoreWaste.calculatedQuantity).toBeGreaterThan(withoutWaste.calculatedQuantity);
+    expect(withoutWaste.calculatedQuantity).toBeCloseTo(52.5, 3);
+    expect(withMoreWaste.calculatedQuantity).toBeCloseTo(60, 3);
+  });
+
+  it("varios materiales generales de distinta categoría se agrupan por separado en el resumen", () => {
+    const groups = groupLinesByCategory([
+      { id: "g1", name: "Pintura extra", categoryName: "Pintura interior", quantity: 5, unit: "UNIT", unitPrice: 200, lineTotal: 1000 },
+      { id: "g2", name: "Tornillos", categoryName: "Otros", quantity: 100, unit: "UNIT", unitPrice: 2, lineTotal: 200 },
+    ]);
+    expect(groups).toHaveLength(2);
+    expect(groups.map((g) => g.categoryName)).toEqual(["Pintura interior", "Otros"]);
   });
 });

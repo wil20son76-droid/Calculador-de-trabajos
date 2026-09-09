@@ -115,9 +115,13 @@ export function calcItem(item: CalcItemInput): CalcItemResult {
  */
 export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
   const items = input.items.map(calcItem);
+  const generalMaterials = input.generalMaterials.map(calcMaterial);
 
   const laborSubtotal = round2(items.reduce((sum, i) => sum + i.laborNet, 0));
-  const materialSubtotal = round2(items.reduce((sum, i) => sum + i.materialsNet, 0));
+  const itemMaterialSubtotal = round2(items.reduce((sum, i) => sum + i.materialsNet, 0));
+  const generalMaterialsGross = round2(generalMaterials.reduce((sum, m) => sum + m.total, 0));
+  const generalMaterialsCost = round2(generalMaterials.reduce((sum, m) => sum + m.totalCost, 0));
+  const materialSubtotal = round2(itemMaterialSubtotal + generalMaterialsGross);
   const otherCostsSubtotal = round2(
     input.otherCosts.reduce((sum, c) => sum + (c.quantity || 0) * (c.unitPrice || 0), 0)
   );
@@ -180,7 +184,9 @@ export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
   // "Otros costes" se pasan al cliente a coste (sin margen), por lo que su coste
   // interno es el mismo importe que su venta.
   const laborCostInternal = round2(items.reduce((sum, i) => sum + i.laborCostInternal, 0));
-  const materialCostInternal = round2(items.reduce((sum, i) => sum + i.materialsCost, 0));
+  const materialCostInternal = round2(
+    items.reduce((sum, i) => sum + i.materialsCost, 0) + generalMaterialsCost
+  );
   const totalCostInternal = round2(laborCostInternal + materialCostInternal + otherCostsSubtotal);
   const grossProfit = round2(subtotalAfterDiscount - totalCostInternal);
   const marginPercent =
@@ -188,6 +194,7 @@ export function calcQuote(input: CalcQuoteInput): CalcQuoteResult {
 
   return {
     items,
+    generalMaterials,
     laborSubtotal,
     materialSubtotal,
     otherCostsSubtotal,

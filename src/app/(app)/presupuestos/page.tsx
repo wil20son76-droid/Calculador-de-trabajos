@@ -42,6 +42,7 @@ export default async function QuotesPage({ searchParams }: PageProps<"/presupues
       projectName: q.projectName,
       siteAddress: q.siteAddress,
       quoteDate: q.quoteDate.toISOString(),
+      updatedAt: q.updatedAt.toISOString(),
       jobType: categoryNames.length > 0 ? categoryNames.join(", ") : "—",
       surfaceM2,
       laborTotal: Number(q.cachedLaborTotal),

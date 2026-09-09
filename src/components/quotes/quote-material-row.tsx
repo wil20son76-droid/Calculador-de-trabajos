@@ -22,6 +22,7 @@ export function QuoteMaterialRow({
   material,
   currency,
   baseQuantity,
+  editableBaseQuantity = false,
   onChange,
   onRemove,
 }: {
@@ -29,10 +30,18 @@ export function QuoteMaterialRow({
   currency: string;
   /** Cantidad base (m² o m) de la línea de trabajo, usada por el cálculo automático. */
   baseQuantity: number;
+  /**
+   * Si es true (materiales generales del proyecto, sin trabajo/habitación de
+   * origen), la cantidad base se introduce a mano en `material.baseQuantity`
+   * en vez de derivarse de una medición — sección 12 de la spec.
+   */
+  editableBaseQuantity?: boolean;
   onChange: (patch: Partial<MaterialDraft>) => void;
   onRemove: () => void;
 }) {
   const [calcOpen, setCalcOpen] = useState(false);
+
+  const effectiveBaseQuantity = editableBaseQuantity ? material.baseQuantity ?? 0 : baseQuantity;
 
   const auto =
     material.calcType !== "NONE"
@@ -45,7 +54,7 @@ export function QuoteMaterialRow({
             packageSize: material.packageSize,
             containerSizes: material.containerSizes,
           },
-          baseQuantity
+          effectiveBaseQuantity
         )
       : null;
 
@@ -187,6 +196,20 @@ export function QuoteMaterialRow({
                     />
                   </label>
                 </>
+              )}
+
+              {editableBaseQuantity && material.calcType !== "NONE" && (
+                <label className="flex flex-col gap-1 text-[11px] text-slate-500">
+                  Cantidad base
+                  <Input
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={material.baseQuantity ?? 0}
+                    onChange={(e) => onChange({ baseQuantity: Number(e.target.value) })}
+                    className="py-1 text-xs"
+                  />
+                </label>
               )}
 
               {material.calcType === "PACKAGE" && (

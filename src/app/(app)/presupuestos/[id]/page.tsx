@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { getCompanyId } from "@/lib/auth/session";
 import { prisma } from "@/lib/db/prisma";
-import { QUOTE_FULL_INCLUDE } from "@/lib/quotes/service";
+import { QUOTE_FULL_INCLUDE, type QuoteWithRelations } from "@/lib/quotes/service";
 import { QuoteEditor } from "@/components/quotes/quote-editor";
 import type { QuoteDraft } from "@/lib/quotes/draft-types";
 
@@ -36,6 +36,30 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
   ]);
 
   if (!quote) notFound();
+
+  function mapMaterial(m: QuoteWithRelations["generalMaterials"][number]) {
+    return {
+      id: m.id,
+      materialLibraryItemId: m.materialLibraryItemId,
+      categoryName: m.categoryName,
+      name: m.name,
+      description: m.description,
+      supplier: m.supplier,
+      notes: m.notes,
+      quantity: Number(m.quantity),
+      unit: m.unit,
+      purchasePrice: Number(m.purchasePrice),
+      marginPercent: Number(m.marginPercent),
+      calcType: m.calcType,
+      coveragePerUnit: m.coveragePerUnit != null ? Number(m.coveragePerUnit) : null,
+      coats: m.coats,
+      wastePercent: Number(m.wastePercent),
+      packageSize: m.packageSize != null ? Number(m.packageSize) : null,
+      containerSizes: Array.isArray(m.containerSizes) ? (m.containerSizes as number[]) : null,
+      baseQuantity: m.baseQuantity != null ? Number(m.baseQuantity) : null,
+      calculatedQuantity: m.calculatedQuantity != null ? Number(m.calculatedQuantity) : null,
+    };
+  }
 
   const draft: QuoteDraft = {
     projectName: quote.projectName ?? "",
@@ -86,23 +110,7 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
       measurementSource: item.measurementSource,
       subtractOpeningWidths: item.subtractOpeningWidths,
       roomIds: item.rooms.map((r) => r.roomId),
-      materials: item.materials.map((m) => ({
-        id: m.id,
-        materialLibraryItemId: m.materialLibraryItemId,
-        name: m.name,
-        description: m.description,
-        quantity: Number(m.quantity),
-        unit: m.unit,
-        purchasePrice: Number(m.purchasePrice),
-        marginPercent: Number(m.marginPercent),
-        calcType: m.calcType,
-        coveragePerUnit: m.coveragePerUnit != null ? Number(m.coveragePerUnit) : null,
-        coats: m.coats,
-        wastePercent: Number(m.wastePercent),
-        packageSize: m.packageSize != null ? Number(m.packageSize) : null,
-        containerSizes: Array.isArray(m.containerSizes) ? (m.containerSizes as number[]) : null,
-        calculatedQuantity: m.calculatedQuantity != null ? Number(m.calculatedQuantity) : null,
-      })),
+      materials: item.materials.map(mapMaterial),
     })),
     otherCosts: quote.otherCosts.map((c) => ({
       id: c.id,
@@ -110,6 +118,7 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
       quantity: Number(c.quantity),
       unitPrice: Number(c.unitPrice),
     })),
+    generalMaterials: quote.generalMaterials.map(mapMaterial),
   };
 
   const serializedPriceList = priceListItems.map((p) => ({
@@ -140,6 +149,8 @@ export default async function QuoteDetailPage({ params }: PageProps<"/presupuest
     <QuoteEditor
       quoteId={quote.id}
       quoteNumber={quote.quoteNumber}
+      createdAt={quote.createdAt.toISOString()}
+      updatedAt={quote.updatedAt.toISOString()}
       initialDraft={draft}
       priceListItems={serializedPriceList}
       categories={categories.map((c) => ({ id: c.id, name: c.name }))}

@@ -12,8 +12,12 @@ import type {
 export interface MaterialDraft {
   id: string;
   materialLibraryItemId?: string | null;
+  /** Categoría para agrupar el resumen de materiales y el PDF (sección 14). */
+  categoryName?: string | null;
   name: string;
   description?: string | null;
+  supplier?: string | null;
+  notes?: string | null;
   quantity: number;
   unit: MaterialUnit;
   purchasePrice: number;
@@ -24,6 +28,8 @@ export interface MaterialDraft {
   wastePercent: number;
   packageSize?: number | null;
   containerSizes?: number[] | null;
+  /** Cantidad base manual, solo para materiales generales sin trabajo asociado (sección 12). */
+  baseQuantity?: number | null;
   calculatedQuantity?: number | null;
 }
 
@@ -93,6 +99,8 @@ export interface QuoteDraft {
   rooms: RoomDraft[];
   items: ItemDraft[];
   otherCosts: OtherCostDraft[];
+  /** Materiales del proyecto no atados a ningún trabajo (sección 10). */
+  generalMaterials: MaterialDraft[];
 }
 
 let counter = 0;

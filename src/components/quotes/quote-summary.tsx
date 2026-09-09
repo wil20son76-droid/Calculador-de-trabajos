@@ -37,6 +37,7 @@ function Row({
 export function QuoteSummary({
   result,
   categoryGroups,
+  materialCategoryGroups,
   currency,
   totalHours,
   effectiveHourlyRate,
@@ -44,6 +45,7 @@ export function QuoteSummary({
 }: {
   result: CalcQuoteResult;
   categoryGroups: CategorySummaryGroup[];
+  materialCategoryGroups: CategorySummaryGroup[];
   currency: string;
   totalHours: number;
   effectiveHourlyRate: number;
@@ -75,6 +77,23 @@ export function QuoteSummary({
               </div>
             ))}
           </div>
+        </Card>
+      )}
+
+      {materialCategoryGroups.length > 0 && (
+        <Card>
+          <h3 className="mb-2 text-sm font-semibold text-slate-900">Materiales</h3>
+          <div className="divide-y divide-slate-50 text-sm">
+            {materialCategoryGroups.map((group) => (
+              <Row
+                key={group.categoryName}
+                label={`Materiales de ${group.categoryName.toLowerCase()}`}
+                value={money(group.subtotal)}
+              />
+            ))}
+          </div>
+          <div className="my-2 border-t border-slate-200" />
+          <Row label="Total material" value={money(result.materialAfterDiscount)} bold />
         </Card>
       )}
 

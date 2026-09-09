@@ -13,6 +13,12 @@ export function draftToCalcInput(draft: QuoteDraft): CalcQuoteInput {
       quantity: c.quantity,
       unitPrice: c.unitPrice,
     })),
+    generalMaterials: draft.generalMaterials.map((m) => ({
+      id: m.id,
+      quantity: m.quantity,
+      purchasePrice: m.purchasePrice,
+      marginPercent: m.marginPercent,
+    })),
     items: draft.items.map((item) => ({
       id: item.id,
       useDetailedLabor: item.useDetailedLabor,

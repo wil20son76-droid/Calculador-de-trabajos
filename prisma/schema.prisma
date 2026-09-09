@@ -456,9 +456,10 @@ model Quote {
   cachedGrossProfit          Decimal @default(0) @db.Decimal(12, 2)
   cachedMarginPercent        Decimal @default(0) @db.Decimal(6, 2)
 
-  items      QuoteItem[]
-  otherCosts QuoteOtherCost[]
-  rooms      Room[]
+  items            QuoteItem[]
+  otherCosts       QuoteOtherCost[]
+  rooms            Room[]
+  generalMaterials QuoteMaterial[]
 
   @@unique([companyId, quoteNumber])
   @@index([companyId])
@@ -560,29 +561,45 @@ model QuoteItemRoom {
   @@index([roomId])
 }
 
-// Material asociado a una línea de trabajo (sección 5, 6)
+// Material asociado a una línea de trabajo (sección 5, 6), o directamente a un
+// presupuesto cuando no se quiere relacionar con ningún trabajo concreto
+// ("material general del proyecto", sección 10): exactamente uno de
+// quoteItemId/quoteId está presente, nunca los dos ni ninguno.
 model QuoteMaterial {
-  id          String    @id @default(cuid())
-  quoteItemId String
-  quoteItem   QuoteItem @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
+  id          String     @id @default(cuid())
+  quoteItemId String?
+  quoteItem   QuoteItem? @relation(fields: [quoteItemId], references: [id], onDelete: Cascade)
+  quoteId     String?
+  quote       Quote?     @relation(fields: [quoteId], references: [id], onDelete: Cascade)
 
   materialLibraryItemId String?
   materialLibraryItem   MaterialLibraryItem? @relation(fields: [materialLibraryItemId], references: [id], onDelete: SetNull)
 
+  // Categoría para agrupar el resumen de materiales y el PDF (sección 14):
+  // "Pintura interior", "Suelos"... En materiales ligados a un trabajo suele
+  // heredarse de la categoría del trabajo; en materiales generales se elige a mano.
+  categoryName String?
+
   name          String
   description   String?
+  supplier      String? // proveedor opcional (sección 8)
+  notes         String?      @db.Text
   quantity      Decimal      @default(1) @db.Decimal(12, 3) // cantidad final presupuestada/a comprar
   unit          MaterialUnit @default(UNIT)
   purchasePrice Decimal      @default(0) @db.Decimal(12, 2)
   marginPercent Decimal      @default(0) @db.Decimal(6, 3)
 
-  // Cálculo automático a partir de la medición de la línea (habitaciones seleccionadas)
+  // Cálculo automático a partir de la medición de la línea (habitaciones seleccionadas),
+  // o de una cantidad base introducida a mano para materiales generales sin trabajo asociado.
   calcType           MaterialCalcType @default(NONE)
   coveragePerUnit    Decimal?         @db.Decimal(10, 3)
   coats              Int?
   wastePercent       Decimal          @default(0) @db.Decimal(6, 3)
   packageSize        Decimal?         @db.Decimal(10, 3)
   containerSizes     Json?
+  // Cantidad base manual (sin medición de habitación) usada por el cálculo
+  // automático de materiales generales del proyecto (sección 12).
+  baseQuantity       Decimal?         @db.Decimal(12, 3)
   // Última cantidad calculada automáticamente (en la unidad natural: L, kg, m²), para
   // poder detectar y avisar si difiere de `quantity` tras cambiar una habitación.
   calculatedQuantity Decimal?         @db.Decimal(12, 3)
@@ -593,6 +610,7 @@ model QuoteMaterial {
   updatedAt DateTime @updatedAt
 
   @@index([quoteItemId])
+  @@index([quoteId])
 }
 
 // Otros costes del presupuesto (sección 7): transporte, parking, contenedor, etc.

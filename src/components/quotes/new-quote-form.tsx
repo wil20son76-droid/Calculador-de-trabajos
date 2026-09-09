@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -23,6 +23,28 @@ export interface NewQuoteCategoryGroup {
   jobs: NewQuoteJobOption[];
 }
 
+type SelectedJob = NewQuoteJobOption & { categoryName: string };
+
+interface StoredDraft {
+  projectName: string;
+  siteAddress: string;
+  notesInternal: string;
+  quoteDate: string;
+  activeCategories: string[];
+  selectedJobs: SelectedJob[];
+}
+
+// Protege el trabajo de selección de trabajos antes de que exista ningún
+// registro en PostgreSQL (sección 3 de la spec): si se cierra la pestaña, se
+// recarga la página o se pierde la conexión mientras se está montando un
+// cálculo nuevo, no hay nada que perder porque nada se ha guardado todavía —
+// salvo esta copia local, que se ofrece recuperar al volver.
+const DRAFT_KEY = "new-quote-draft";
+
+function isMeaningfulDraft(d: StoredDraft): boolean {
+  return d.projectName.trim() !== "" || d.selectedJobs.length > 0;
+}
+
 export function NewQuoteForm({
   groups,
   initialCategory,
@@ -40,11 +62,77 @@ export function NewQuoteForm({
   const [activeCategories, setActiveCategories] = useState<Set<string>>(
     () => new Set(initialCategory ? [initialCategory] : [])
   );
-  const [selectedJobs, setSelectedJobs] = useState<Map<string, NewQuoteJobOption & { categoryName: string }>>(
-    new Map()
-  );
+  const [selectedJobs, setSelectedJobs] = useState<Map<string, SelectedJob>>(new Map());
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState("");
+  const [recovery, setRecovery] = useState<StoredDraft | null>(null);
+  const isFirstRender = useRef(true);
+
+  // Al montar: si hay un borrador de una sesión anterior sin terminar de crear, ofrecer recuperarlo.
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as StoredDraft;
+      if (isMeaningfulDraft(parsed)) {
+        // Lectura de localStorage (sistema externo) solo al montar: no hay forma
+        // de derivar este estado durante el render, así que se fija aquí.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setRecovery(parsed);
+      } else {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch {
+      // Borrador corrupto o localStorage no disponible: se ignora sin romper la página.
+    }
+  }, []);
+
+  // En cada cambio, refrescar la copia local (excepto en el primer render, que
+  // solo refleja lo que ya se cargó/decidió, para no pisar un borrador antes
+  // de que el usuario decida recuperarlo o descartarlo).
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    const draft: StoredDraft = {
+      projectName,
+      siteAddress,
+      notesInternal,
+      quoteDate,
+      activeCategories: Array.from(activeCategories),
+      selectedJobs: Array.from(selectedJobs.values()),
+    };
+    try {
+      if (isMeaningfulDraft(draft)) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+      } else {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch {
+      // localStorage lleno o no disponible: no crítico en esta pantalla.
+    }
+  }, [projectName, siteAddress, notesInternal, quoteDate, activeCategories, selectedJobs]);
+
+  function recoverDraft() {
+    if (!recovery) return;
+    setProjectName(recovery.projectName);
+    setSiteAddress(recovery.siteAddress);
+    setNotesInternal(recovery.notesInternal);
+    setQuoteDate(recovery.quoteDate);
+    setActiveCategories(new Set(recovery.activeCategories));
+    setSelectedJobs(new Map(recovery.selectedJobs.map((j) => [j.id, j])));
+    setRecovery(null);
+  }
+
+  function discardDraft() {
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {
+      // no-op
+    }
+    setRecovery(null);
+  }
 
   function toggleCategory(categoryName: string) {
     setActiveCategories((prev) => {
@@ -93,6 +181,12 @@ export function NewQuoteForm({
     setCreating(false);
     if (res.ok) {
       const quote = await res.json();
+      // Ya existe de forma permanente en PostgreSQL: el borrador local deja de hacer falta.
+      try {
+        localStorage.removeItem(DRAFT_KEY);
+      } catch {
+        // no-op
+      }
       router.push(`/presupuestos/${quote.id}`);
     } else {
       setError("No se pudo crear el cálculo. Inténtalo de nuevo.");
@@ -101,6 +195,22 @@ export function NewQuoteForm({
 
   return (
     <Card className="space-y-4">
+      {recovery && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3">
+          <p className="mb-2 text-sm text-amber-900">
+            Se encontró un cálculo sin guardar. ¿Deseas recuperarlo?
+          </p>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={recoverDraft}>
+              Recuperar
+            </Button>
+            <Button size="sm" variant="outline" onClick={discardDraft}>
+              Descartar
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Field label="Nombre del trabajo/proyecto *" hint='Ej. "Pintura apartamento 75 m²"'>
         <Input
           autoFocus
@@ -222,7 +332,7 @@ export function NewQuoteForm({
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       <Button onClick={handleCreate} disabled={creating} className="w-full justify-center">
-        {creating ? "Creando..." : "Crear cálculo"}
+        {creating ? "Guardando..." : "Guardar proyecto"}
       </Button>
     </Card>
   );

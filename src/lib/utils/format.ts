@@ -24,6 +24,18 @@ export function formatDate(value: Date | string): string {
   }).format(date);
 }
 
+/** Fecha y hora, para "Última modificación" (sección 19 de la spec). */
+export function formatDateTime(value: Date | string): string {
+  const date = typeof value === "string" ? new Date(value) : value;
+  return new Intl.DateTimeFormat("sv-SE", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
 const UNIT_LABELS: Record<string, string> = {
   UNIT: "st",
   HOUR: "h",

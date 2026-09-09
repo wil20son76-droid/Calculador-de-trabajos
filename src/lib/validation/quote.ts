@@ -48,8 +48,16 @@ export const roomSchema = z.object({
 export const quoteMaterialSchema = z.object({
   id: z.string().optional(),
   materialLibraryItemId: z.string().optional().nullable(),
-  name: z.string().min(1),
+  categoryName: z.string().optional().nullable(),
+  // Un material personalizado ("+ Material personalizado") empieza sin nombre
+  // y se autoguarda antes de que el usuario lo rellene, igual que items/habitaciones:
+  // exigirlo aquí rompería el autoguardado justo al añadirlo (y, al fallar la
+  // validación de todo el payload, perdería en el mismo golpe cualquier otro
+  // cambio sin guardar de esa misma línea de trabajo).
+  name: z.string().default(""),
   description: z.string().optional().nullable(),
+  supplier: z.string().optional().nullable(),
+  notes: z.string().optional().nullable(),
   quantity: z.coerce.number().min(0),
   unit: z.enum(MATERIAL_UNITS),
   purchasePrice: z.coerce.number().min(0),
@@ -60,6 +68,7 @@ export const quoteMaterialSchema = z.object({
   wastePercent: z.coerce.number().min(0).default(0),
   packageSize: z.coerce.number().min(0).optional().nullable(),
   containerSizes: z.array(z.coerce.number().min(0)).optional().nullable(),
+  baseQuantity: z.coerce.number().min(0).optional().nullable(),
   calculatedQuantity: z.coerce.number().min(0).optional().nullable(),
 });
 
@@ -134,6 +143,7 @@ export const quoteUpdateSchema = z.object({
   rooms: z.array(roomSchema).optional(),
   items: z.array(quoteItemSchema).optional(),
   otherCosts: z.array(quoteOtherCostSchema).optional(),
+  generalMaterials: z.array(quoteMaterialSchema).optional(),
 });
 
 export type RoomInput = z.infer<typeof roomSchema>;

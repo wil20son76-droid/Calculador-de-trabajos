@@ -12,10 +12,11 @@ export const QUOTE_FULL_INCLUDE = {
     orderBy: { sortOrder: "asc" as const },
     include: {
       materials: { orderBy: { sortOrder: "asc" as const } },
-      rooms: true,
+      rooms: { include: { room: { include: { openings: true } } } },
     },
   },
   otherCosts: { orderBy: { sortOrder: "asc" as const } },
+  generalMaterials: { orderBy: { sortOrder: "asc" as const } },
   rooms: {
     orderBy: { sortOrder: "asc" as const },
     include: { openings: { orderBy: { sortOrder: "asc" as const } } },
@@ -37,6 +38,12 @@ export function toCalcInput(quote: QuoteWithRelations): CalcQuoteInput {
       id: c.id,
       quantity: toNumber(c.quantity),
       unitPrice: toNumber(c.unitPrice),
+    })),
+    generalMaterials: quote.generalMaterials.map((m) => ({
+      id: m.id,
+      quantity: toNumber(m.quantity),
+      purchasePrice: toNumber(m.purchasePrice),
+      marginPercent: toNumber(m.marginPercent),
     })),
     items: quote.items.map((item) => ({
       id: item.id,

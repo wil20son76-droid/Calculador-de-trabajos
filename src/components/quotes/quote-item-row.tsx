@@ -30,6 +30,8 @@ import {
 import type { MaterialOption } from "./material-picker-modal";
 import { MaterialPickerModal } from "./material-picker-modal";
 import { QuoteMaterialRow } from "./quote-material-row";
+import { getSuggestedMaterials } from "@/lib/quotes/suggested-materials";
+import { emptyMaterial } from "@/lib/quotes/draft-types";
 
 const MEASUREMENT_LABELS: Record<MeasurementSource, string> = {
   NONE: "Manual (sin medición)",
@@ -138,6 +140,33 @@ export function QuoteItemRow({
 
   function addMaterial(material: MaterialDraft) {
     update("materials", [...item.materials, material]);
+  }
+
+  // Materiales recomendados (sección 11): nunca se agregan solos, siempre
+  // requieren confirmación explícita ("Agregar todos" o uno a uno).
+  const suggestedMaterials = getSuggestedMaterials(item.name, materialLibrary).filter(
+    (option) => !item.materials.some((m) => m.materialLibraryItemId === option.id)
+  );
+
+  function addSuggestedMaterial(option: MaterialOption) {
+    addMaterial({
+      ...emptyMaterial(),
+      materialLibraryItemId: option.id,
+      name: option.name,
+      unit: option.unit,
+      purchasePrice: option.purchasePrice,
+      marginPercent: option.marginPercent || defaultMargin,
+      calcType: option.calcType,
+      coveragePerUnit: option.coveragePerUnit,
+      coats: option.coatsDefault,
+      wastePercent: option.wastePercentDefault,
+      packageSize: option.packageSize,
+      containerSizes: option.containerSizes,
+    });
+  }
+
+  function addAllSuggestedMaterials() {
+    suggestedMaterials.forEach(addSuggestedMaterial);
   }
 
   return (
@@ -452,6 +481,31 @@ export function QuoteItemRow({
                     <Plus className="h-3.5 w-3.5" /> Lägg till material
                   </Button>
                 </div>
+
+                {suggestedMaterials.length > 0 && (
+                  <div className="mb-3 rounded-lg border border-blue-100 bg-blue-50/60 p-2.5">
+                    <div className="mb-1.5 flex items-center justify-between">
+                      <span className="text-[11px] font-medium text-blue-800">
+                        Materiales recomendados para &ldquo;{item.name}&rdquo;
+                      </span>
+                      <Button type="button" size="sm" variant="outline" onClick={addAllSuggestedMaterials}>
+                        Agregar todos
+                      </Button>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {suggestedMaterials.map((option) => (
+                        <button
+                          key={option.id}
+                          type="button"
+                          onClick={() => addSuggestedMaterial(option)}
+                          className="flex items-center gap-1 rounded-full border border-blue-200 bg-white px-2.5 py-1 text-xs text-blue-700 hover:bg-blue-100"
+                        >
+                          <Plus className="h-3 w-3" /> {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {item.materials.length > 0 && (
                   <div className="overflow-x-auto rounded-lg border border-slate-100">

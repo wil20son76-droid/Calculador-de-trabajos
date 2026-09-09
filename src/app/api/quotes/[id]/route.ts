@@ -42,7 +42,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
       return NextResponse.json({ error: "Presupuesto no encontrado" }, { status: 404 });
     }
 
-    const { items, otherCosts, rooms, ...scalarFields } = body;
+    const { items, otherCosts, rooms, generalMaterials, ...scalarFields } = body;
 
     await prisma.$transaction(async (tx) => {
       await tx.quote.update({ where: { id }, data: scalarFields });
@@ -123,8 +123,11 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
               materials: {
                 create: item.materials.map((m, mIndex) => ({
                   materialLibraryItemId: m.materialLibraryItemId ?? null,
+                  categoryName: m.categoryName,
                   name: m.name,
                   description: m.description,
+                  supplier: m.supplier,
+                  notes: m.notes,
                   quantity: m.quantity,
                   unit: m.unit,
                   purchasePrice: m.purchasePrice,
@@ -135,6 +138,7 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
                   wastePercent: m.wastePercent,
                   packageSize: m.packageSize,
                   containerSizes: m.containerSizes ?? undefined,
+                  baseQuantity: m.baseQuantity,
                   calculatedQuantity: m.calculatedQuantity,
                   sortOrder: mIndex,
                 })),
@@ -156,6 +160,36 @@ export async function PATCH(req: NextRequest, { params }: RouteContext<"/api/quo
               name: cost.name,
               quantity: cost.quantity,
               unitPrice: cost.unitPrice,
+              sortOrder: index,
+            },
+          });
+        }
+      }
+
+      if (generalMaterials) {
+        await tx.quoteMaterial.deleteMany({ where: { quoteId: id } });
+        for (const [index, m] of generalMaterials.entries()) {
+          await tx.quoteMaterial.create({
+            data: {
+              quoteId: id,
+              materialLibraryItemId: m.materialLibraryItemId ?? null,
+              categoryName: m.categoryName,
+              name: m.name,
+              description: m.description,
+              supplier: m.supplier,
+              notes: m.notes,
+              quantity: m.quantity,
+              unit: m.unit,
+              purchasePrice: m.purchasePrice,
+              marginPercent: m.marginPercent,
+              calcType: m.calcType,
+              coveragePerUnit: m.coveragePerUnit,
+              coats: m.coats,
+              wastePercent: m.wastePercent,
+              packageSize: m.packageSize,
+              containerSizes: m.containerSizes ?? undefined,
+              baseQuantity: m.baseQuantity,
+              calculatedQuantity: m.calculatedQuantity,
               sortOrder: index,
             },
           });
